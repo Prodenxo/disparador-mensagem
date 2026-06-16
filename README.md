@@ -36,7 +36,12 @@ npm run worker       # fila de disparos
 2. Serviços: **web** (porta 3000), **worker**, **mysql**, **redis**
 3. Volume compartilhado `uploads` entre web e worker
 4. Variáveis: copie de `.env.example`
-5. Após primeiro deploy: `npx prisma db push` + seed do Super Admin
+5. Após primeiro deploy (no terminal do serviço **web**):
+   ```bash
+   npm run db:push
+   npm run db:seed
+   ```
+   > Não use `npx prisma` solto — baixa Prisma 7 e quebra. Use `npm run db:push`.
 
 ### Evolution API
 
