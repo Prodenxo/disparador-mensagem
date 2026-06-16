@@ -22,12 +22,9 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
-COPY --from=builder /app/node_modules/tsx ./node_modules/tsx
-COPY --from=builder /app/node_modules/.bin/tsx ./node_modules/.bin/tsx
-COPY --from=builder /app/node_modules/bcryptjs ./node_modules/bcryptjs
-RUN mkdir -p uploads && chown -R nextjs:nodejs uploads prisma node_modules package.json
+RUN npm install prisma@6.19.3 bcryptjs@2.4.3 --no-save --ignore-scripts \
+  && mkdir -p uploads \
+  && chown -R nextjs:nodejs /app
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000

@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
-async function main (): Promise<void> {
+async function main () {
   const email = process.env.SEED_SUPER_ADMIN_EMAIL
   const password = process.env.SEED_SUPER_ADMIN_PASSWORD
   const name = process.env.SEED_SUPER_ADMIN_NAME || 'Super Admin'
