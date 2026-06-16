@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
-import { createUser, updateUser } from '@/actions/users'
 import { sectorRoleLabel } from '@/lib/permissions'
 import type { SectorAssignmentInput } from '@/lib/validations/user'
 import { Button } from '@/components/ui/button'
@@ -77,11 +77,12 @@ function userToForm (user: UserRow): FormState {
 }
 
 export function UsersManager ({ users, sectors, currentUserId }: UsersManagerProps) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<UserRow | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm())
   const [error, setError] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const activeSectors = sectors.filter(sector => sector.active)
 
@@ -149,36 +150,44 @@ export function UsersManager ({ users, sectors, currentUserId }: UsersManagerPro
     }))
   }
 
-  function handleSubmit (event: React.FormEvent) {
+  async function handleSubmit (event: React.FormEvent) {
     event.preventDefault()
     setError(null)
+    setIsSubmitting(true)
 
-    startTransition(async () => {
-      const result = editing
-        ? await updateUser(editing.id, {
-            name: form.name,
-            email: form.email,
-            password: form.password || undefined,
-            isSuperAdmin: form.isSuperAdmin,
-            active: form.active,
-            sectorAssignments: form.sectorAssignments
-          })
-        : await createUser({
-            name: form.name,
-            email: form.email,
-            password: form.password,
-            isSuperAdmin: form.isSuperAdmin,
-            active: form.active,
-            sectorAssignments: form.sectorAssignments
-          })
+    try {
+      const payload = {
+        name: form.name,
+        email: form.email,
+        password: form.password || undefined,
+        isSuperAdmin: form.isSuperAdmin,
+        active: form.active,
+        sectorAssignments: form.sectorAssignments
+      }
 
-      if (!result.success) {
-        setError(result.error)
+      const url = editing ? `/api/users/${editing.id}` : '/api/users'
+      const method = editing ? 'PATCH' : 'POST'
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error ?? 'Não foi possível salvar o usuário')
         return
       }
 
       closeDialog()
-    })
+      router.refresh()
+    } catch {
+      setError('Erro de conexão. Tente novamente.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -417,8 +426,8 @@ export function UsersManager ({ users, sectors, currentUserId }: UsersManagerPro
             <Button type="button" variant="secondary" onClick={closeDialog}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
               {editing ? 'Salvar' : 'Criar'}
             </Button>
           </div>
