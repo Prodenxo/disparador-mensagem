@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum GlobalRole {
+  SUPER_ADMIN
+}
+
+enum SectorRole {
+  SECTOR_ADMIN
+  EMPLOYEE
+}
+
+enum AnnouncementStatus {
+  DRAFT
+  SCHEDULED
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+model User {
+  id           String      @id @default(uuid())
+  email        String      @unique
+  passwordHash String
+  name         String
+  globalRole   GlobalRole?
+  active       Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  sectorLinks   UserSector[]
+  announcements Announcement[] @relation("CreatedBy")
+}
+
+model Sector {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members       UserSector[]
+  announcements Announcement[]
+}
+
+model UserSector {
+  id                     String     @id @default(uuid())
+  userId                 String
+  sectorId               String
+  role                   SectorRole
+  canCreateAnnouncements Boolean    @default(false)
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sector Sector @relation(fields: [sectorId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sectorId])
+}
+
+model WhatsappGroup {
+  id               String   @id @default(uuid())
+  jid              String   @unique
+  name             String
+  participantCount Int      @default(0)
+  syncedAt         DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  announcements Announcement[]
+}
+
+model Announcement {
+  id          String             @id @default(uuid())
+  sectorId    String
+  groupId     String
+  message     String             @db.Text
+  imagePath   String?
+  scheduledAt DateTime
+  status      AnnouncementStatus @default(SCHEDULED)
+  createdById String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  sector    Sector        @relation(fields: [sectorId], references: [id])
+  group     WhatsappGroup @relation(fields: [groupId], references: [id])
+  createdBy User          @relation("CreatedBy", fields: [createdById], references: [id])
+  logs      DispatchLog[]
+}
+
+model DispatchLog {
+  id             String   @id @default(uuid())
+  announcementId String
+  status         String
+  errorMessage   String?  @db.Text
+  mentionCount   Int      @default(0)
+  sentAt         DateTime @default(now())
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+}
+
+model SystemConfig {
+  id    String @id @default("default")
+  key   String @unique
+  value String @db.Text
+}
