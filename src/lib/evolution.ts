@@ -35,14 +35,42 @@ function evolutionErrorDetail (error: unknown): string {
   }
 
   if (body && typeof body === 'object') {
-    const message = (body as Record<string, unknown>).message
-      ?? (body as Record<string, unknown>).error
+    const record = body as Record<string, unknown>
+    const nested = record.response
+
+    if (nested && typeof nested === 'object') {
+      const nestedMessage = (nested as Record<string, unknown>).message
+      if (Array.isArray(nestedMessage) && nestedMessage.length > 0) {
+        return status
+          ? `${status}: ${nestedMessage.map(String).join(' ')}`
+          : nestedMessage.map(String).join(' ')
+      }
+    }
+
+    const message = record.message ?? record.error
     if (typeof message === 'string' && message.length > 0) {
       return status ? `${status}: ${message}` : message
     }
   }
 
   return status ? `${status}: ${error.message}` : error.message
+}
+
+async function fetchEvolutionInstanceNames (): Promise<string[]> {
+  try {
+    const response = await axios.get(
+      `${normalizeBaseUrl(env.evolution.baseUrl)}/instance/fetchInstances`,
+      { headers: headers(), timeout: 15000 }
+    )
+
+    const list = Array.isArray(response.data) ? response.data : []
+
+    return list
+      .map(item => String((item as Record<string, unknown>).name || ''))
+      .filter(Boolean)
+  } catch {
+    return []
+  }
 }
 
 export interface EvolutionGroup {
@@ -222,9 +250,23 @@ export async function fetchAllGroups (): Promise<EvolutionGroup[]> {
     }
   }
 
-  throw new Error(
-    `Não foi possível listar grupos na Evolution API (${evolutionErrorDetail(lastError)})`
-  )
+  throw new Error(await buildFetchAllGroupsError(lastError))
+}
+
+async function buildFetchAllGroupsError (lastError: unknown): Promise<string> {
+  const detail = evolutionErrorDetail(lastError)
+  let message = `Não foi possível listar grupos na Evolution API (${detail})`
+
+  if (axios.isAxiosError(lastError) && lastError.response?.status === 404) {
+    const available = await fetchEvolutionInstanceNames()
+    message += `. EVOLUTION_INSTANCE_NAME atual: "${env.evolution.instance}"`
+
+    if (available.length > 0) {
+      message += `. Instâncias disponíveis: ${available.join(', ')}`
+    }
+  }
+
+  return message
 }
 
 /** @deprecated Use fetchResolvedGroupParticipants */
