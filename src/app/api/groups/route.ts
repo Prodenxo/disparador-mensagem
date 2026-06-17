@@ -24,6 +24,11 @@ function runGroupsSyncInBackground (): void {
       return
     }
 
+    if (!result.data) {
+      failGroupsSync('Resposta inválida ao sincronizar grupos')
+      return
+    }
+
     completeGroupsSync(result.data.count)
     revalidatePath('/grupos')
     revalidatePath('/anuncios/novo')
