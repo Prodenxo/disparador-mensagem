@@ -28,4 +28,4 @@ RUN npm install prisma@6.19.3 bcryptjs@2.4.3 --no-save \
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate && node server.js"]
