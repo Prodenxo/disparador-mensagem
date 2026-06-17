@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import type { GroupsSyncState } from '@/lib/services/groups-sync-state'
 
 export interface GroupRow {
   id: string
@@ -21,15 +22,107 @@ interface GroupsManagerProps {
   canSync: boolean
 }
 
+interface GroupsApiResponse {
+  groups?: GroupRow[]
+  sync?: GroupsSyncState
+  error?: string
+}
+
 export function GroupsManager ({ initialGroups, canSync }: GroupsManagerProps) {
   const router = useRouter()
   const [groups, setGroups] = useState(initialGroups)
   const [error, setError] = useState<string | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     setGroups(initialGroups)
   }, [initialGroups])
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+  }, [])
+
+  const applySyncState = useCallback((sync: GroupsSyncState | undefined, nextGroups?: GroupRow[]) => {
+    if (nextGroups) {
+      setGroups(nextGroups)
+    }
+
+    if (!sync) return
+
+    if (sync.status === 'running') {
+      setIsSyncing(true)
+      setError(null)
+      return
+    }
+
+    setIsSyncing(false)
+
+    if (sync.status === 'error' && sync.error) {
+      setError(sync.error)
+      return
+    }
+
+    if (sync.status === 'success') {
+      setError(null)
+      router.refresh()
+    }
+  }, [router])
+
+  const pollSyncStatus = useCallback(async () => {
+    try {
+      const response = await fetch('/api/groups')
+      const data = await response.json() as GroupsApiResponse
+
+      if (!response.ok) {
+        setError(data.error ?? 'Não foi possível verificar a sincronização')
+        setIsSyncing(false)
+        stopPolling()
+        return
+      }
+
+      applySyncState(data.sync, data.groups)
+
+      if (data.sync?.status !== 'running') {
+        stopPolling()
+      }
+    } catch {
+      setError('Erro de conexão ao verificar a sincronização.')
+      setIsSyncing(false)
+      stopPolling()
+    }
+  }, [applySyncState, stopPolling])
+
+  const startPolling = useCallback(() => {
+    stopPolling()
+    void pollSyncStatus()
+    pollRef.current = setInterval(() => {
+      void pollSyncStatus()
+    }, 3000)
+  }, [pollSyncStatus, stopPolling])
+
+  useEffect(() => {
+    if (!canSync) return
+
+    void (async () => {
+      try {
+        const response = await fetch('/api/groups')
+        const data = await response.json() as GroupsApiResponse
+
+        if (response.ok && data.sync?.status === 'running') {
+          applySyncState(data.sync, data.groups)
+          startPolling()
+        }
+      } catch {
+        // ignore on mount
+      }
+    })()
+
+    return stopPolling
+  }, [canSync, applySyncState, startPolling, stopPolling])
 
   async function handleSync () {
     setError(null)
@@ -37,17 +130,21 @@ export function GroupsManager ({ initialGroups, canSync }: GroupsManagerProps) {
 
     try {
       const response = await fetch('/api/groups', { method: 'POST' })
-      const data = await response.json()
+      const data = await response.json() as GroupsApiResponse
 
       if (!response.ok) {
-        setError(data.error ?? 'Não foi possível sincronizar os grupos')
+        setError(data.error ?? 'Não foi possível iniciar a sincronização')
+        setIsSyncing(false)
         return
       }
 
-      router.refresh()
+      applySyncState(data.sync)
+
+      if (data.sync?.status === 'running') {
+        startPolling()
+      }
     } catch {
       setError('Erro de conexão. Tente novamente.')
-    } finally {
       setIsSyncing(false)
     }
   }
@@ -73,11 +170,11 @@ export function GroupsManager ({ initialGroups, canSync }: GroupsManagerProps) {
 
       {isSyncing && (
         <p className="text-sm text-text-muted">
-          Pode levar 1–3 minutos se houver muitos grupos no WhatsApp.
+          Sincronização em andamento. Pode levar 1–3 minutos — não feche a página.
         </p>
       )}
 
-      {groups.length === 0 && (
+      {groups.length === 0 && !isSyncing && (
         <div className="rounded-lg border border-dashed border-border bg-surface p-6 text-sm text-text-muted">
           {canSync
             ? 'Nenhum grupo sincronizado ainda. Adicione o bot aos grupos no WhatsApp e clique em "Sincronizar agora".'

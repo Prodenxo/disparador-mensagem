@@ -3,10 +3,35 @@ import { revalidatePath } from 'next/cache'
 import { getSession } from '@/lib/auth/session'
 import { isSuperAdmin } from '@/lib/permissions'
 import { listGroupsService, syncGroupsService } from '@/lib/services/groups'
+import {
+  completeGroupsSync,
+  failGroupsSync,
+  getGroupsSyncState,
+  startGroupsSyncIfIdle
+} from '@/lib/services/groups-sync-state'
 
 function canSyncGroups (session: NonNullable<Awaited<ReturnType<typeof getSession>>>): boolean {
   if (isSuperAdmin(session)) return true
   return session.sectors.some(link => link.role === 'SECTOR_ADMIN')
+}
+
+function runGroupsSyncInBackground (): void {
+  void (async () => {
+    const result = await syncGroupsService()
+
+    if (!result.success) {
+      failGroupsSync(result.error)
+      return
+    }
+
+    completeGroupsSync(result.data.count)
+    revalidatePath('/grupos')
+    revalidatePath('/anuncios/novo')
+  })().catch(error => {
+    console.error('[api/groups background sync]', error)
+    const message = error instanceof Error ? error.message : 'Erro ao sincronizar grupos'
+    failGroupsSync(message)
+  })
 }
 
 export async function GET () {
@@ -18,7 +43,10 @@ export async function GET () {
 
   try {
     const groups = await listGroupsService()
-    return NextResponse.json({ groups })
+    return NextResponse.json({
+      groups,
+      sync: getGroupsSyncState()
+    })
   } catch (error) {
     console.error('[api/groups GET]', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
@@ -36,19 +64,19 @@ export async function POST () {
     return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
   }
 
-  try {
-    const result = await syncGroupsService()
+  const started = startGroupsSyncIfIdle()
 
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 })
-    }
-
-    revalidatePath('/grupos')
-    revalidatePath('/anuncios/novo')
-
-    return NextResponse.json({ success: true, data: result.data })
-  } catch (error) {
-    console.error('[api/groups POST]', error)
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
+  if (!started) {
+    return NextResponse.json({
+      success: true,
+      sync: getGroupsSyncState()
+    })
   }
+
+  runGroupsSyncInBackground()
+
+  return NextResponse.json({
+    success: true,
+    sync: getGroupsSyncState()
+  })
 }
