@@ -6,6 +6,7 @@ import {
   Building2,
   LayoutDashboard,
   Megaphone,
+  Radio,
   Settings,
   Users,
   UsersRound,
@@ -40,6 +41,12 @@ export function Sidebar ({ user }: SidebarProps) {
       href: '/anuncios',
       label: 'Anúncios',
       icon: Megaphone,
+      visible: true
+    },
+    {
+      href: '/campanhas',
+      label: 'Campanhas contínuas',
+      icon: Radio,
       visible: true
     },
     {

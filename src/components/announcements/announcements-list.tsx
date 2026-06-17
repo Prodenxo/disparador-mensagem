@@ -20,6 +20,7 @@ export interface AnnouncementListItem {
   participantCount: number
   createdByName: string
   hasImage: boolean
+  mentionAll: boolean
   seriesId: string | null
 }
 
@@ -157,6 +158,7 @@ export function AnnouncementsList ({ announcements, canCreate, canSyncQueue }: A
                     <p className="mt-1 text-xs text-text-muted">
                       por {item.createdByName}
                       {item.hasImage ? ' · com imagem' : ''}
+                      {item.mentionAll ? ' · menciona todos' : ' · sem menções'}
                       {item.seriesId ? ' · série recorrente' : ''}
                     </p>
                   </td>

@@ -22,10 +22,12 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
+COPY --from=builder /app/scripts ./scripts
 RUN npm install prisma@6.19.3 bcryptjs@2.4.3 --no-save \
   && mkdir -p uploads \
+  && chmod +x ./scripts/docker-entrypoint-web.sh \
   && chown -R nextjs:nodejs /app
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
-CMD ["sh", "-c", "npx prisma db push --skip-generate && node server.js"]
+CMD ["./scripts/docker-entrypoint-web.sh"]

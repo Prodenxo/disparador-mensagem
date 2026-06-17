@@ -1,4 +1,5 @@
 import { UserMenu } from '@/components/layout/user-menu'
+import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { isSuperAdmin, type SessionUser } from '@/lib/permissions'
 import { prisma } from '@/lib/prisma'
 
@@ -39,7 +40,10 @@ export async function PanelHeader ({ user }: PanelHeaderProps) {
         <p className="text-sm font-semibold text-text-primary">{sectorLabel}</p>
       </div>
 
-      <UserMenu user={user} />
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
+        <UserMenu user={user} />
+      </div>
     </header>
   )
 }

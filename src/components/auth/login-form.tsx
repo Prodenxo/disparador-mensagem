@@ -6,6 +6,7 @@ import { Loader2, Megaphone } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ThemeToggle } from '@/components/theme/theme-toggle'
 
 export function LoginForm () {
   const router = useRouter()
@@ -46,7 +47,11 @@ export function LoginForm () {
   }
 
   return (
-    <div className="w-full max-w-md">
+    <div className="relative w-full max-w-md">
+      <div className="absolute -top-2 right-0 sm:-top-12">
+        <ThemeToggle showLabel />
+      </div>
+
       <div className="mb-8 flex flex-col items-center text-center">
         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <Megaphone className="h-6 w-6" aria-hidden="true" />

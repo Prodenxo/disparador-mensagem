@@ -1,12 +1,14 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, Megaphone, Search } from 'lucide-react'
+import { Loader2, Megaphone } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { GroupSelect } from '@/components/groups/group-select'
 
 export interface AnnouncementSectorOption {
   id: string
@@ -47,15 +49,9 @@ export function AnnouncementForm ({
   const [scheduledDate, setScheduledDate] = useState(defaultDate)
   const [recurrenceDays, setRecurrenceDays] = useState(1)
   const [times, setTimes] = useState<string[]>(() => buildInitialTimes(defaultTime))
-  const [groupQuery, setGroupQuery] = useState('')
+  const [mentionAll, setMentionAll] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const filteredGroups = useMemo(() => {
-    const query = groupQuery.trim().toLowerCase()
-    if (!query) return groups
-    return groups.filter(group => group.name.toLowerCase().includes(query))
-  }, [groups, groupQuery])
 
   const totalSlots = recurrenceDays * times.length
 
@@ -78,6 +74,12 @@ export function AnnouncementForm ({
   async function handleSubmit (event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
+
+    if (!groupId) {
+      setError('Selecione um grupo')
+      return
+    }
+
     setIsSubmitting(true)
 
     const form = event.currentTarget
@@ -88,6 +90,7 @@ export function AnnouncementForm ({
     formData.set('scheduledDate', scheduledDate)
     formData.set('recurrenceDays', String(recurrenceDays))
     formData.set('recurrenceTimes', JSON.stringify(times))
+    formData.set('mentionAll', mentionAll ? 'true' : 'false')
 
     try {
       const response = await fetch('/api/announcements', {
@@ -129,37 +132,14 @@ export function AnnouncementForm ({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="announcement-group-search">Buscar grupo</Label>
-          <div className="relative">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"
-              aria-hidden="true"
-            />
-            <Input
-              id="announcement-group-search"
-              value={groupQuery}
-              onChange={event => setGroupQuery(event.target.value)}
-              placeholder="Filtrar por nome do grupo"
-              className="pl-9"
-            />
-          </div>
-          <Label htmlFor="announcement-group" className="sr-only">Grupo</Label>
-          <Select
+          <Label htmlFor="announcement-group">Grupo</Label>
+          <GroupSelect
             id="announcement-group"
+            inputId="announcement-group"
+            groups={groups}
             value={groupId}
-            onChange={event => setGroupId(event.target.value)}
-            required
-          >
-            <option value="">Selecione um grupo</option>
-            {filteredGroups.map(group => (
-              <option key={group.id} value={group.id}>
-                {group.name} ({group.participantCount} participantes)
-              </option>
-            ))}
-          </Select>
-          <p className="text-xs text-text-muted">
-            {filteredGroups.length} de {groups.length} grupos
-          </p>
+            onChange={setGroupId}
+          />
         </div>
       </div>
 
@@ -171,9 +151,31 @@ export function AnnouncementForm ({
           onChange={event => setMessage(event.target.value)}
           required
           rows={6}
-          placeholder="Texto do anúncio. Todos os participantes do grupo serão mencionados."
+          placeholder={mentionAll
+            ? 'Texto do anúncio. Todos os participantes do grupo serão mencionados.'
+            : 'Texto do anúncio. Será enviado sem mencionar participantes.'}
           className="flex min-h-[140px] w-full rounded-md border border-border bg-surface px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
         />
+      </div>
+
+      <div className="rounded-lg border border-border bg-background/40 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-text-primary">Mencionar todos</p>
+            <p className="text-xs text-text-muted mt-1">
+              {mentionAll
+                ? 'Ativo: todos os participantes do grupo receberão menção (@).'
+                : 'Inativo: a mensagem será enviada sem marcar ninguém.'}
+            </p>
+          </div>
+          <Switch
+            id="announcement-mention-all"
+            checked={mentionAll}
+            onCheckedChange={setMentionAll}
+            label={mentionAll ? 'Ativo' : 'Inativo'}
+          />
+        </div>
+        <input type="hidden" name="mentionAll" value={mentionAll ? 'true' : 'false'} />
       </div>
 
       <div className="rounded-lg border border-border bg-background/40 p-4 space-y-4">

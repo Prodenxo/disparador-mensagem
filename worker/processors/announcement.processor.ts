@@ -1,13 +1,6 @@
-import path from 'path'
 import { AnnouncementStatus } from '@prisma/client'
-import {
-  fetchMentionJidsForGroup,
-  sendMediaWithMentions,
-  sendMediaWithMentionsFromBase64,
-  sendTextWithMentions
-} from '../../src/lib/evolution'
+import { dispatchGroupMessage } from '../../src/lib/dispatch/send-group-message'
 import { prisma } from '../../src/lib/prisma'
-import { resolveAnnouncementImagePath } from '../../src/lib/uploads'
 
 export async function processAnnouncement (announcementId: string): Promise<void> {
   const announcement = await prisma.announcement.findUnique({
@@ -32,42 +25,15 @@ export async function processAnnouncement (announcementId: string): Promise<void
   })
 
   try {
-    const { participantCount, participants } = await fetchMentionJidsForGroup(
-      announcement.group.jid
-    )
-
-    if (participantCount === 0) {
-      throw new Error('Grupo sem participantes para mencionar')
-    }
-
-    if (announcement.image?.data) {
-      const fileName = announcement.imagePath
-        ? path.basename(announcement.imagePath)
-        : `image.${announcement.image.mime.split('/')[1] || 'jpg'}`
-
-      await sendMediaWithMentionsFromBase64(
-        announcement.group.jid,
-        announcement.image.data,
-        fileName,
-        announcement.image.mime,
-        announcement.message,
-        participants
-      )
-    } else if (announcement.imagePath) {
-      const imagePath = await resolveAnnouncementImagePath(announcement.imagePath)
-      await sendMediaWithMentions(
-        announcement.group.jid,
-        imagePath,
-        announcement.message,
-        participants
-      )
-    } else {
-      await sendTextWithMentions(
-        announcement.group.jid,
-        announcement.message,
-        participants
-      )
-    }
+    const mentionCount = await dispatchGroupMessage({
+      groupJid: announcement.group.jid,
+      message: announcement.message,
+      mentionAll: announcement.mentionAll ?? true,
+      imagePath: announcement.imagePath,
+      image: announcement.image
+        ? { data: announcement.image.data, mime: announcement.image.mime }
+        : null
+    })
 
     await prisma.$transaction([
       prisma.announcement.update({
@@ -78,7 +44,7 @@ export async function processAnnouncement (announcementId: string): Promise<void
         data: {
           announcementId,
           status: 'SENT',
-          mentionCount: participantCount
+          mentionCount
         }
       })
     ])

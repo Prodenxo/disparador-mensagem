@@ -1,19 +1,65 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
-  --color-primary: #2563eb;
-  --color-primary-foreground: #ffffff;
-  --color-background: #fafafa;
-  --color-surface: #ffffff;
-  --color-border: #e5e7eb;
-  --color-text-primary: #111827;
-  --color-text-muted: #6b7280;
-  --color-success: #059669;
-  --color-warning: #d97706;
-  --color-danger: #dc2626;
+  --color-primary: var(--app-primary);
+  --color-primary-foreground: var(--app-primary-foreground);
+  --color-background: var(--app-background);
+  --color-surface: var(--app-surface);
+  --color-border: var(--app-border);
+  --color-text-primary: var(--app-text-primary);
+  --color-text-muted: var(--app-text-muted);
+  --color-success: var(--app-success);
+  --color-warning: var(--app-warning);
+  --color-danger: var(--app-danger);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.08);
-  --shadow-modal: 0 8px 30px rgb(0 0 0 / 0.12);
+  --shadow-card: var(--app-shadow-card);
+  --shadow-modal: var(--app-shadow-modal);
+}
+
+:root {
+  color-scheme: light;
+  --app-primary: #2563eb;
+  --app-primary-foreground: #ffffff;
+  --app-background: #fafafa;
+  --app-surface: #ffffff;
+  --app-border: #e5e7eb;
+  --app-text-primary: #111827;
+  --app-text-muted: #6b7280;
+  --app-success: #059669;
+  --app-warning: #d97706;
+  --app-danger: #dc2626;
+  --app-shadow-card: 0 1px 3px rgb(0 0 0 / 0.08);
+  --app-shadow-modal: 0 8px 30px rgb(0 0 0 / 0.12);
+  --app-select-bg: #ffffff;
+  --app-select-menu-bg: #ffffff;
+  --app-select-border: #e5e7eb;
+  --app-select-hover: rgb(37 99 235 / 0.08);
+  --app-select-focus: rgb(37 99 235 / 0.3);
+  --app-select-focus-border: rgb(37 99 235 / 0.5);
+}
+
+.dark {
+  color-scheme: dark;
+  --app-primary: #3b82f6;
+  --app-primary-foreground: #ffffff;
+  --app-background: #09090b;
+  --app-surface: #18181b;
+  --app-border: #27272a;
+  --app-text-primary: #fafafa;
+  --app-text-muted: #a1a1aa;
+  --app-success: #34d399;
+  --app-warning: #fbbf24;
+  --app-danger: #f87171;
+  --app-shadow-card: 0 1px 3px rgb(0 0 0 / 0.45);
+  --app-shadow-modal: 0 8px 30px rgb(0 0 0 / 0.55);
+  --app-select-bg: #18181b;
+  --app-select-menu-bg: #18181b;
+  --app-select-border: #3f3f46;
+  --app-select-hover: rgb(59 130 246 / 0.15);
+  --app-select-focus: rgb(59 130 246 / 0.35);
+  --app-select-focus-border: rgb(59 130 246 / 0.55);
 }
 
 @layer base {

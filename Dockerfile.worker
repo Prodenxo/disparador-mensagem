@@ -4,5 +4,6 @@ COPY package.json package-lock.json* ./
 COPY prisma ./prisma
 RUN npm ci || npm install
 COPY . .
-RUN npx prisma generate
-CMD ["npm", "run", "worker"]
+RUN npx prisma generate \
+  && chmod +x ./scripts/docker-entrypoint-worker.sh
+CMD ["./scripts/docker-entrypoint-worker.sh"]

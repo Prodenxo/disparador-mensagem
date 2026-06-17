@@ -7,7 +7,9 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
+    "start:prod": "node server.js",
     "worker": "tsx worker/index.ts",
+    "worker:prod": "tsx worker/index.ts",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "node prisma/seed.mjs",
@@ -30,6 +32,7 @@
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-select": "^5.10.2",
     "tailwind-merge": "^3.6.0",
     "zod": "^3.24.1"
   },

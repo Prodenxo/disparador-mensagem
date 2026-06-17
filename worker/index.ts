@@ -2,8 +2,10 @@ import 'dotenv/config'
 import { Worker } from 'bullmq'
 import { env } from '../src/lib/env'
 import { ANNOUNCEMENT_QUEUE } from '../src/lib/queue/announcement.queue'
+import { syncActiveCampaignJobs } from '../src/lib/queue/campaign-sync'
 import { syncScheduledAnnouncementJobs } from '../src/lib/queue/announcement-sync'
 import { processAnnouncement } from './processors/announcement.processor'
+import { processCampaign } from './processors/campaign.processor'
 
 const connection = { url: env.redisUrl, maxRetriesPerRequest: null }
 
@@ -13,6 +15,12 @@ console.log('[WORKER] Redis:', env.redisUrl.replace(/:[^:@/]+@/, ':***@'))
 const worker = new Worker(
   ANNOUNCEMENT_QUEUE,
   async job => {
+    if (job.name === 'campaign-dispatch') {
+      console.log(`[WORKER] Processando campanha ${job.data.campaignId}`)
+      await processCampaign(String(job.data.campaignId))
+      return
+    }
+
     console.log(`[WORKER] Processando anúncio ${job.data.announcementId}`)
     await processAnnouncement(String(job.data.announcementId))
   },
@@ -28,21 +36,36 @@ worker.on('active', job => {
 })
 
 worker.on('completed', job => {
+  if (job.name === 'campaign-dispatch') {
+    console.log(`[WORKER] Campanha ${job.data.campaignId} ciclo concluído`)
+    return
+  }
+
   console.log(`[WORKER] Anúncio ${job.id} enviado`)
 })
 
 worker.on('failed', (job, error) => {
-  console.error(`[WORKER] Falha no anúncio ${job?.id}:`, error.message)
+  const label = job?.name === 'campaign-dispatch'
+    ? `campanha ${job?.data?.campaignId}`
+    : `anúncio ${job?.id}`
+
+  console.error(`[WORKER] Falha no ${label}:`, error.message)
 })
 
 worker.on('error', error => {
   console.error('[WORKER] Erro na fila:', error.message)
 })
 
-void syncScheduledAnnouncementJobs()
-  .then(result => {
+void Promise.all([
+  syncScheduledAnnouncementJobs(),
+  syncActiveCampaignJobs()
+])
+  .then(([announcements, campaigns]) => {
     console.log(
-      `[WORKER] Fila sincronizada: ${result.enqueued} reenfileirados, ${result.skipped} já na fila, ${result.total} agendados no banco`
+      `[WORKER] Fila sincronizada: ${announcements.enqueued} anúncios reenfileirados, ${announcements.skipped} já na fila, ${announcements.total} agendados no banco`
+    )
+    console.log(
+      `[WORKER] Campanhas ativas: ${campaigns.enqueued} reenfileiradas, ${campaigns.skipped} ignoradas, ${campaigns.total} ativas no banco`
     )
   })
   .catch(error => {

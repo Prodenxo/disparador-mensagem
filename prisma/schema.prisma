@@ -35,8 +35,9 @@ model User {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  sectorLinks   UserSector[]
-  announcements Announcement[] @relation("CreatedBy")
+  sectorLinks          UserSector[]
+  announcements        Announcement[]        @relation("CreatedBy")
+  continuousCampaigns  ContinuousCampaign[]  @relation("CampaignCreatedBy")
 }
 
 model Sector {
@@ -47,8 +48,9 @@ model Sector {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members       UserSector[]
-  announcements Announcement[]
+  members              UserSector[]
+  announcements        Announcement[]
+  continuousCampaigns  ContinuousCampaign[]
 }
 
 model UserSector {
@@ -75,7 +77,8 @@ model WhatsappGroup {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  announcements Announcement[]
+  announcements        Announcement[]
+  continuousCampaigns  ContinuousCampaign[]
 }
 
 model AnnouncementImage {
@@ -84,7 +87,8 @@ model AnnouncementImage {
   data      String   @db.LongText
   createdAt DateTime @default(now())
 
-  announcements Announcement[]
+  announcements       Announcement[]
+  continuousCampaigns ContinuousCampaign[]
 }
 
 model Announcement {
@@ -94,6 +98,7 @@ model Announcement {
   message     String             @db.Text
   imagePath   String?
   imageId     String?
+  mentionAll  Boolean            @default(true)
   scheduledAt DateTime
   status      AnnouncementStatus @default(SCHEDULED)
   seriesId    String?
@@ -125,4 +130,41 @@ model SystemConfig {
   id    String @id @default("default")
   key   String @unique
   value String @db.Text
+}
+
+model ContinuousCampaign {
+  id              String    @id @default(uuid())
+  name            String
+  sectorId        String
+  groupId         String
+  message         String    @db.Text
+  imagePath       String?
+  imageId         String?
+  mentionAll      Boolean   @default(true)
+  active          Boolean   @default(false)
+  intervalMinutes Int
+  lastSentAt      DateTime?
+  nextSendAt      DateTime?
+  createdById     String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sector    Sector             @relation(fields: [sectorId], references: [id])
+  group     WhatsappGroup      @relation(fields: [groupId], references: [id])
+  image     AnnouncementImage? @relation(fields: [imageId], references: [id])
+  createdBy User               @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  logs      CampaignDispatchLog[]
+
+  @@index([active])
+}
+
+model CampaignDispatchLog {
+  id             String   @id @default(uuid())
+  campaignId     String
+  status         String
+  errorMessage   String?  @db.Text
+  mentionCount   Int      @default(0)
+  sentAt         DateTime @default(now())
+
+  campaign ContinuousCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 }

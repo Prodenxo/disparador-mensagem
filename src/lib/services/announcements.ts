@@ -15,6 +15,7 @@ import { cancelAnnouncementJob, scheduleAnnouncementJob } from '@/lib/queue/anno
 import { saveAnnouncementImageData } from '@/lib/uploads'
 import {
   announcementInputSchema,
+  parseBooleanField,
   parseRecurrenceTimes
 } from '@/lib/validations/announcement'
 
@@ -26,6 +27,7 @@ export interface AnnouncementRow {
   createdAt: Date
   imagePath: string | null
   imageId: string | null
+  mentionAll: boolean
   seriesId: string | null
   sector: { id: string; name: string }
   group: { id: string; name: string; participantCount: number }
@@ -90,6 +92,7 @@ export async function listAnnouncementsService (
       createdAt: true,
       imagePath: true,
       imageId: true,
+      mentionAll: true,
       seriesId: true,
       sector: { select: { id: true, name: true } },
       group: { select: { id: true, name: true, participantCount: true } },
@@ -110,7 +113,8 @@ export async function createAnnouncementService (
     message: String(formData.get('message') ?? '').trim(),
     scheduledDate: String(formData.get('scheduledDate') ?? ''),
     recurrenceDays: formData.get('recurrenceDays') ?? 1,
-    recurrenceTimes
+    recurrenceTimes,
+    mentionAll: parseBooleanField(formData.get('mentionAll'))
   })
 
   if (!parsed.success) {
@@ -190,6 +194,7 @@ export async function createAnnouncementService (
           message: parsed.data.message,
           imagePath,
           imageId,
+          mentionAll: parsed.data.mentionAll,
           scheduledAt,
           status: 'SCHEDULED',
           seriesId,
