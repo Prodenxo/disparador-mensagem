@@ -5,6 +5,7 @@ import {
   sendTextWithMentions
 } from '../../src/lib/evolution'
 import { prisma } from '../../src/lib/prisma'
+import { assertUploadExists } from '../../src/lib/uploads'
 
 export async function processAnnouncement (announcementId: string): Promise<void> {
   const announcement = await prisma.announcement.findUnique({
@@ -35,9 +36,10 @@ export async function processAnnouncement (announcementId: string): Promise<void
     }
 
     if (announcement.imagePath) {
+      const imagePath = await assertUploadExists(announcement.imagePath)
       await sendMediaWithMentions(
         announcement.group.jid,
-        announcement.imagePath,
+        imagePath,
         announcement.message,
         participants
       )

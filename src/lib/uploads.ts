@@ -5,6 +5,24 @@ import { env } from '@/lib/env'
 
 const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
+export function resolveUploadPath (storedPath: string): string {
+  if (path.isAbsolute(storedPath)) return storedPath
+  return path.resolve(process.cwd(), storedPath)
+}
+
+export async function assertUploadExists (storedPath: string): Promise<string> {
+  const resolved = resolveUploadPath(storedPath)
+
+  try {
+    await fs.access(resolved)
+    return resolved
+  } catch {
+    throw new Error(
+      'Imagem não encontrada no worker. Configure o volume compartilhado "uploads" entre web e worker no Easypanel.'
+    )
+  }
+}
+
 export async function saveAnnouncementImage (file: File): Promise<string> {
   if (!allowedMimeTypes.has(file.type)) {
     throw new Error('Formato de imagem inválido. Use JPG, PNG ou WebP.')
