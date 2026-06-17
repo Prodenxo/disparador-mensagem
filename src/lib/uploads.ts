@@ -119,6 +119,15 @@ export async function resolveAnnouncementImagePath (storedPath: string): Promise
 }
 
 export async function saveAnnouncementImage (file: File): Promise<string> {
+  const saved = await saveAnnouncementImageData(file)
+  return saved.path
+}
+
+export async function saveAnnouncementImageData (file: File): Promise<{
+  path: string
+  base64: string
+  mime: string
+}> {
   if (!allowedMimeTypes.has(file.type)) {
     throw new Error('Formato de imagem inválido. Use JPG, PNG ou WebP.')
   }
@@ -142,5 +151,9 @@ export async function saveAnnouncementImage (file: File): Promise<string> {
   const buffer = Buffer.from(await file.arrayBuffer())
   await fs.writeFile(filePath, buffer)
 
-  return filePath
+  return {
+    path: filePath,
+    base64: buffer.toString('base64'),
+    mime: file.type
+  }
 }

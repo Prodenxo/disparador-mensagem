@@ -1,7 +1,9 @@
+import path from 'path'
 import { AnnouncementStatus } from '@prisma/client'
 import {
   fetchMentionJidsForGroup,
   sendMediaWithMentions,
+  sendMediaWithMentionsFromBase64,
   sendTextWithMentions
 } from '../../src/lib/evolution'
 import { prisma } from '../../src/lib/prisma'
@@ -10,7 +12,10 @@ import { resolveAnnouncementImagePath } from '../../src/lib/uploads'
 export async function processAnnouncement (announcementId: string): Promise<void> {
   const announcement = await prisma.announcement.findUnique({
     where: { id: announcementId },
-    include: { group: true }
+    include: {
+      group: true,
+      image: true
+    }
   })
 
   if (!announcement) {
@@ -35,7 +40,20 @@ export async function processAnnouncement (announcementId: string): Promise<void
       throw new Error('Grupo sem participantes para mencionar')
     }
 
-    if (announcement.imagePath) {
+    if (announcement.image?.data) {
+      const fileName = announcement.imagePath
+        ? path.basename(announcement.imagePath)
+        : `image.${announcement.image.mime.split('/')[1] || 'jpg'}`
+
+      await sendMediaWithMentionsFromBase64(
+        announcement.group.jid,
+        announcement.image.data,
+        fileName,
+        announcement.image.mime,
+        announcement.message,
+        participants
+      )
+    } else if (announcement.imagePath) {
       const imagePath = await resolveAnnouncementImagePath(announcement.imagePath)
       await sendMediaWithMentions(
         announcement.group.jid,

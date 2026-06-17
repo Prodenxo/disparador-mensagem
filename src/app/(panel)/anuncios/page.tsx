@@ -28,7 +28,7 @@ export default async function AnunciosPage () {
         groupName: item.group.name,
         participantCount: item.group.participantCount,
         createdByName: item.createdBy.name,
-        hasImage: Boolean(item.imagePath),
+        hasImage: Boolean(item.imagePath || item.imageId),
         seriesId: item.seriesId
       }))}
     />

@@ -78,12 +78,22 @@ model WhatsappGroup {
   announcements Announcement[]
 }
 
+model AnnouncementImage {
+  id        String   @id @default(uuid())
+  mime      String
+  data      String   @db.LongText
+  createdAt DateTime @default(now())
+
+  announcements Announcement[]
+}
+
 model Announcement {
   id          String             @id @default(uuid())
   sectorId    String
   groupId     String
   message     String             @db.Text
   imagePath   String?
+  imageId     String?
   scheduledAt DateTime
   status      AnnouncementStatus @default(SCHEDULED)
   seriesId    String?
@@ -91,9 +101,10 @@ model Announcement {
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
-  sector    Sector        @relation(fields: [sectorId], references: [id])
-  group     WhatsappGroup @relation(fields: [groupId], references: [id])
-  createdBy User          @relation("CreatedBy", fields: [createdById], references: [id])
+  sector    Sector             @relation(fields: [sectorId], references: [id])
+  group     WhatsappGroup      @relation(fields: [groupId], references: [id])
+  image     AnnouncementImage? @relation(fields: [imageId], references: [id])
+  createdBy User               @relation("CreatedBy", fields: [createdById], references: [id])
   logs      DispatchLog[]
 
   @@index([seriesId])

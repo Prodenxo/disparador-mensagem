@@ -299,6 +299,30 @@ export async function sendTextWithMentions (
   await axios.post(instanceUrl('/message/sendText'), payload, { headers: headers() })
 }
 
+export async function sendMediaWithMentionsFromBase64 (
+  groupJid: string,
+  base64: string,
+  fileName: string,
+  mimetype: string,
+  caption: string,
+  mentions: string[]
+): Promise<void> {
+  const mentionJids = await buildMentionJids(mentions)
+
+  const payload: Record<string, unknown> = {
+    number: groupJid,
+    mediatype: 'image',
+    mimetype,
+    caption,
+    media: base64,
+    fileName
+  }
+
+  applyMentionsToPayload(payload, mentionJids)
+
+  await axios.post(instanceUrl('/message/sendMedia'), payload, { headers: headers() })
+}
+
 export async function sendMediaWithMentions (
   groupJid: string,
   imagePath: string,

@@ -12,7 +12,7 @@ import {
   type SessionUser
 } from '@/lib/permissions'
 import { cancelAnnouncementJob, scheduleAnnouncementJob } from '@/lib/queue/announcement.queue'
-import { saveAnnouncementImage } from '@/lib/uploads'
+import { saveAnnouncementImageData } from '@/lib/uploads'
 import {
   announcementInputSchema,
   parseRecurrenceTimes
@@ -25,6 +25,7 @@ export interface AnnouncementRow {
   scheduledAt: Date
   createdAt: Date
   imagePath: string | null
+  imageId: string | null
   seriesId: string | null
   sector: { id: string; name: string }
   group: { id: string; name: string; participantCount: number }
@@ -88,6 +89,7 @@ export async function listAnnouncementsService (
       scheduledAt: true,
       createdAt: true,
       imagePath: true,
+      imageId: true,
       seriesId: true,
       sector: { select: { id: true, name: true } },
       group: { select: { id: true, name: true, participantCount: true } },
@@ -154,11 +156,22 @@ export async function createAnnouncementService (
   }
 
   let imagePath: string | null = null
+  let imageId: string | null = null
   const imageFile = formData.get('image')
 
   if (imageFile instanceof File && imageFile.size > 0) {
     try {
-      imagePath = await saveAnnouncementImage(imageFile)
+      const saved = await saveAnnouncementImageData(imageFile)
+      imagePath = saved.path
+
+      const storedImage = await prisma.announcementImage.create({
+        data: {
+          mime: saved.mime,
+          data: saved.base64
+        }
+      })
+
+      imageId = storedImage.id
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao salvar imagem'
       return actionError(message)
@@ -176,6 +189,7 @@ export async function createAnnouncementService (
           groupId: parsed.data.groupId,
           message: parsed.data.message,
           imagePath,
+          imageId,
           scheduledAt,
           status: 'SCHEDULED',
           seriesId,
