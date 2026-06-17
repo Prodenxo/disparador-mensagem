@@ -26,6 +26,17 @@ export function accessibleSectorIds (user: SessionUser): string[] | 'all' {
   return user.sectors.map(s => s.sectorId)
 }
 
+export function adminSectorIds (user: SessionUser): string[] | 'all' {
+  if (isSuperAdmin(user)) return 'all'
+  return user.sectors
+    .filter(link => link.role === 'SECTOR_ADMIN')
+    .map(link => link.sectorId)
+}
+
+export function canManageTeam (user: SessionUser, sectorId: string): boolean {
+  return isSectorAdmin(user, sectorId)
+}
+
 export function sectorRoleLabel (role: SectorRole | GlobalRole | null | undefined): string {
   switch (role) {
     case 'SUPER_ADMIN': return 'Super Admin'

@@ -1,23 +1,26 @@
-function PlaceholderPage ({
-  title,
-  description
-}: {
-  title: string
-  description: string
-}) {
-  return (
-    <div className="rounded-lg border border-dashed border-border bg-surface p-8 text-center shadow-[var(--shadow-card)]">
-      <h1 className="text-xl font-semibold text-text-primary">{title}</h1>
-      <p className="mx-auto mt-2 max-w-lg text-sm text-text-muted">{description}</p>
-    </div>
-  )
-}
+import { redirect } from 'next/navigation'
+import { getSession } from '@/lib/auth/session'
+import { isSuperAdmin } from '@/lib/permissions'
+import { listGroupsService } from '@/lib/services/groups'
+import { GroupsManager } from '@/components/groups/groups-manager'
 
-export default function GruposPage () {
+export default async function GruposPage () {
+  const session = await getSession()
+
+  if (!session) {
+    redirect('/login')
+  }
+
+  const groups = await listGroupsService()
+  const canSync = isSuperAdmin(session) || session.sectors.some(link => link.role === 'SECTOR_ADMIN')
+
   return (
-    <PlaceholderPage
-      title="Grupos WhatsApp"
-      description="Sincronização com a Evolution API será implementada em breve."
+    <GroupsManager
+      canSync={canSync}
+      initialGroups={groups.map(group => ({
+        ...group,
+        syncedAt: group.syncedAt.toISOString()
+      }))}
     />
   )
 }
