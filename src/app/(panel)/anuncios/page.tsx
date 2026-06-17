@@ -1,23 +1,34 @@
-function PlaceholderPage ({
-  title,
-  description
-}: {
-  title: string
-  description: string
-}) {
-  return (
-    <div className="rounded-lg border border-dashed border-border bg-surface p-8 text-center shadow-[var(--shadow-card)]">
-      <h1 className="text-xl font-semibold text-text-primary">{title}</h1>
-      <p className="mx-auto mt-2 max-w-lg text-sm text-text-muted">{description}</p>
-    </div>
-  )
-}
+import { redirect } from 'next/navigation'
+import { getSession } from '@/lib/auth/session'
+import { canCreateAnnouncement, isSuperAdmin } from '@/lib/permissions'
+import { listAnnouncementsService } from '@/lib/services/announcements'
+import { AnnouncementsList } from '@/components/announcements/announcements-list'
 
-export default function AnunciosPage () {
+export default async function AnunciosPage () {
+  const session = await getSession()
+
+  if (!session) {
+    redirect('/login')
+  }
+
+  const announcements = await listAnnouncementsService(session)
+  const canCreate = isSuperAdmin(session)
+    || session.sectors.some(link => canCreateAnnouncement(session, link.sectorId))
+
   return (
-    <PlaceholderPage
-      title="Anúncios"
-      description="Listagem e gestão de anúncios será implementada na próxima etapa."
+    <AnnouncementsList
+      canCreate={canCreate}
+      announcements={announcements.map(item => ({
+        id: item.id,
+        message: item.message,
+        status: item.status,
+        scheduledAt: item.scheduledAt.toISOString(),
+        sectorName: item.sector.name,
+        groupName: item.group.name,
+        participantCount: item.group.participantCount,
+        createdByName: item.createdBy.name,
+        hasImage: Boolean(item.imagePath)
+      }))}
     />
   )
 }

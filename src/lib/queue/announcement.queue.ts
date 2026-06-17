@@ -1,5 +1,5 @@
 import { Queue } from 'bullmq'
-import { env } from '../../src/lib/env'
+import { env } from '@/lib/env'
 
 export const ANNOUNCEMENT_QUEUE = 'announcements'
 

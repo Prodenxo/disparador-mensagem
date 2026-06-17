@@ -9,7 +9,7 @@ export const env = {
   redisUrl: clean(process.env.REDIS_URL) || 'redis://localhost:6379',
   timezone: clean(process.env.TZ) || 'America/Sao_Paulo',
   uploadDir: clean(process.env.UPLOAD_DIR) || './uploads',
-  maxImageSizeMb: Number(process.env.MAX_IMAGE_SIZE_MB || 5),
+  maxImageSizeMb: Number(process.env.MAX_IMAGE_SIZE_MB || 16),
   evolution: {
     baseUrl: clean(process.env.EVOLUTION_API_URL),
     apiKey: clean(process.env.EVOLUTION_API_KEY),

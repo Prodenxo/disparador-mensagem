@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import { Worker } from 'bullmq'
 import { env } from '../src/lib/env'
-import { ANNOUNCEMENT_QUEUE } from './queues/announcement.queue'
+import { ANNOUNCEMENT_QUEUE } from '../src/lib/queue/announcement.queue'
 import { processAnnouncement } from './processors/announcement.processor'
 
 const connection = { url: env.redisUrl, maxRetriesPerRequest: null }

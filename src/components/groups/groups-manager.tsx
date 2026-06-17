@@ -1,11 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { Loader2, RefreshCw, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import type { GroupsSyncState } from '@/lib/services/groups-sync-state'
 
@@ -33,7 +34,17 @@ export function GroupsManager ({ initialGroups, canSync }: GroupsManagerProps) {
   const [groups, setGroups] = useState(initialGroups)
   const [error, setError] = useState<string | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const filteredGroups = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) return groups
+    return groups.filter(group =>
+      group.name.toLowerCase().includes(query)
+      || group.jid.toLowerCase().includes(query)
+    )
+  }, [groups, searchQuery])
 
   useEffect(() => {
     setGroups(initialGroups)
@@ -187,33 +198,60 @@ export function GroupsManager ({ initialGroups, canSync }: GroupsManagerProps) {
       )}
 
       {groups.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-border bg-surface shadow-[var(--shadow-card)]">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-border bg-background/60">
-              <tr>
-                <th className="px-4 py-3 font-medium text-text-muted">Nome</th>
-                <th className="px-4 py-3 font-medium text-text-muted">Participantes</th>
-                <th className="px-4 py-3 font-medium text-text-muted">Última sync</th>
-                <th className="px-4 py-3 font-medium text-text-muted hidden lg:table-cell">JID</th>
-              </tr>
-            </thead>
-            <tbody>
-              {groups.map(group => (
-                <tr key={group.id} className="border-b border-border last:border-b-0">
-                  <td className="px-4 py-3 font-medium text-text-primary">{group.name}</td>
-                  <td className="px-4 py-3">
-                    <Badge variant={group.participantCount > 256 ? 'warning' : 'muted'}>
-                      {group.participantCount}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3 text-text-muted">
-                    {format(new Date(group.syncedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-text-muted hidden lg:table-cell">{group.jid}</td>
+        <div className="space-y-3">
+          <div className="relative max-w-md">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"
+              aria-hidden="true"
+            />
+            <Input
+              value={searchQuery}
+              onChange={event => setSearchQuery(event.target.value)}
+              placeholder="Buscar grupo por nome ou JID"
+              className="pl-9"
+              aria-label="Buscar grupo por nome ou JID"
+            />
+          </div>
+          <p className="text-xs text-text-muted">
+            {filteredGroups.length} de {groups.length} grupos
+          </p>
+
+          <div className="overflow-hidden rounded-lg border border-border bg-surface shadow-[var(--shadow-card)]">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-border bg-background/60">
+                <tr>
+                  <th className="px-4 py-3 font-medium text-text-muted">Nome</th>
+                  <th className="px-4 py-3 font-medium text-text-muted">Participantes</th>
+                  <th className="px-4 py-3 font-medium text-text-muted">Última sync</th>
+                  <th className="px-4 py-3 font-medium text-text-muted hidden lg:table-cell">JID</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredGroups.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-text-muted">
+                      Nenhum grupo encontrado para &quot;{searchQuery}&quot;.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredGroups.map(group => (
+                    <tr key={group.id} className="border-b border-border last:border-b-0">
+                      <td className="px-4 py-3 font-medium text-text-primary">{group.name}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant={group.participantCount > 256 ? 'warning' : 'muted'}>
+                          {group.participantCount}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-text-muted">
+                        {format(new Date(group.syncedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-text-muted hidden lg:table-cell">{group.jid}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
