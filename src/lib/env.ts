@@ -4,6 +4,7 @@ function clean (val: string | undefined): string {
 
 export const env = {
   appUrl: clean(process.env.APP_URL) || 'http://localhost:3000',
+  internalAppUrl: clean(process.env.INTERNAL_APP_URL),
   authSecret: clean(process.env.AUTH_SECRET),
   databaseUrl: clean(process.env.DATABASE_URL),
   redisUrl: clean(process.env.REDIS_URL) || 'redis://localhost:6379',

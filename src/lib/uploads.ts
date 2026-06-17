@@ -34,27 +34,71 @@ export async function assertUploadExists (storedPath: string): Promise<string> {
   }
 }
 
+function getWebFetchBaseUrls (): string[] {
+  const urls = [
+    env.internalAppUrl,
+    env.appUrl !== 'http://localhost:3000' ? env.appUrl : '',
+    'http://disparadordemensagem:3000'
+  ]
+    .filter(Boolean)
+    .map((url) => url.replace(/\/$/, ''))
+
+  return [...new Set(urls)]
+}
+
+function formatFetchError (url: string, error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+  const cause = error instanceof Error && error.cause instanceof Error
+    ? ` — ${error.cause.message}`
+    : ''
+
+  return `${url}: ${message}${cause}`
+}
+
 async function fetchImageFromWeb (filename: string, localPath: string): Promise<string> {
   if (!env.authSecret) {
     throw new Error('AUTH_SECRET não configurado no worker para buscar imagem do web')
   }
 
-  const baseUrl = env.appUrl.replace(/\/$/, '')
-  const response = await fetch(`${baseUrl}/api/internal/uploads/${filename}`, {
-    headers: { 'x-internal-secret': env.authSecret }
-  })
+  const baseUrls = getWebFetchBaseUrls()
 
-  if (!response.ok) {
+  if (baseUrls.length === 0) {
     throw new Error(
-      `Imagem não encontrada em ${localPath} e falha ao buscar no web (${response.status}). ` +
-      'Monte volume /app/uploads nos dois serviços ou defina APP_URL=http://disparadordemensagem:3000 no worker.'
+      'APP_URL ou INTERNAL_APP_URL não configurado no worker. ' +
+      'Use a URL pública do web, ex.: https://central-de-publicacoes-disparadordemensagem.4tnf3f.easypanel.host'
     )
   }
 
-  const tmpPath = path.join(os.tmpdir(), filename)
-  const buffer = Buffer.from(await response.arrayBuffer())
-  await fs.writeFile(tmpPath, buffer)
-  return tmpPath
+  const errors: string[] = []
+
+  for (const baseUrl of baseUrls) {
+    const url = `${baseUrl}/api/internal/uploads/${filename}`
+
+    try {
+      const response = await fetch(url, {
+        headers: { 'x-internal-secret': env.authSecret },
+        signal: AbortSignal.timeout(30000)
+      })
+
+      if (!response.ok) {
+        errors.push(`${url}: HTTP ${response.status}`)
+        continue
+      }
+
+      const tmpPath = path.join(os.tmpdir(), filename)
+      const buffer = Buffer.from(await response.arrayBuffer())
+      await fs.writeFile(tmpPath, buffer)
+      console.log(`[UPLOAD] Imagem obtida do web: ${url}`)
+      return tmpPath
+    } catch (error) {
+      errors.push(formatFetchError(url, error))
+    }
+  }
+
+  throw new Error(
+    `Imagem não encontrada em ${localPath} e falha ao buscar no web. ` +
+    `Tentativas: ${errors.join(' | ')}`
+  )
 }
 
 export async function resolveAnnouncementImagePath (storedPath: string): Promise<string> {
