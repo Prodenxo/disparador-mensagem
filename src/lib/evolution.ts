@@ -14,8 +14,35 @@ function headers () {
   return { apikey: env.evolution.apiKey }
 }
 
+function normalizeBaseUrl (url: string): string {
+  return url.replace(/\/+$/, '')
+}
+
 function instanceUrl (pathSuffix: string): string {
-  return `${env.evolution.baseUrl}${pathSuffix}/${env.evolution.instance}`
+  return `${normalizeBaseUrl(env.evolution.baseUrl)}${pathSuffix}/${env.evolution.instance}`
+}
+
+function evolutionErrorDetail (error: unknown): string {
+  if (!axios.isAxiosError(error)) {
+    return error instanceof Error ? error.message : 'erro desconhecido'
+  }
+
+  const status = error.response?.status
+  const body = error.response?.data
+
+  if (typeof body === 'string' && body.length > 0) {
+    return status ? `${status}: ${body}` : body
+  }
+
+  if (body && typeof body === 'object') {
+    const message = (body as Record<string, unknown>).message
+      ?? (body as Record<string, unknown>).error
+    if (typeof message === 'string' && message.length > 0) {
+      return status ? `${status}: ${message}` : message
+    }
+  }
+
+  return status ? `${status}: ${error.message}` : error.message
 }
 
 export interface EvolutionGroup {
@@ -158,16 +185,26 @@ export async function fetchMentionJidsForGroup (groupJid: string): Promise<{
 
 export async function fetchAllGroups (): Promise<EvolutionGroup[]> {
   const urls = [
-    instanceUrl('/group/fetchAllGroups'),
-    instanceUrl('/group/fetchAllGroup')
+    `${instanceUrl('/group/fetchAllGroups')}?getParticipants=false`,
+    `${instanceUrl('/group/fetchAllGroup')}?getParticipants=false`
   ]
+
+  let lastError: unknown
 
   for (const url of urls) {
     try {
-      const response = await axios.get(url, { headers: headers() })
+      const response = await axios.get(url, {
+        headers: headers(),
+        timeout: 30000
+      })
+
       const raw = Array.isArray(response.data)
         ? response.data
-        : (response.data?.groups || response.data?.data || [])
+        : (response.data?.groups || response.data?.data || response.data?.response || [])
+
+      if (!Array.isArray(raw)) {
+        throw new Error('Resposta inesperada da Evolution API')
+      }
 
       return raw.map((g: Record<string, unknown>) => {
         const participants = g.participants
@@ -179,12 +216,15 @@ export async function fetchAllGroups (): Promise<EvolutionGroup[]> {
           participantCount: Number(g.size || countFromParticipants || 0)
         }
       }).filter((g: EvolutionGroup) => g.jid.includes('@g.us'))
-    } catch {
+    } catch (error) {
+      lastError = error
       continue
     }
   }
 
-  throw new Error('Não foi possível listar grupos na Evolution API')
+  throw new Error(
+    `Não foi possível listar grupos na Evolution API (${evolutionErrorDetail(lastError)})`
+  )
 }
 
 /** @deprecated Use fetchResolvedGroupParticipants */
