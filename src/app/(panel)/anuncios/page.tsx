@@ -18,6 +18,7 @@ export default async function AnunciosPage () {
   return (
     <AnnouncementsList
       canCreate={canCreate}
+      canSyncQueue={isSuperAdmin(session)}
       announcements={announcements.map(item => ({
         id: item.id,
         message: item.message,

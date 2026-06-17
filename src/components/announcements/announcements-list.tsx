@@ -26,12 +26,40 @@ export interface AnnouncementListItem {
 interface AnnouncementsListProps {
   announcements: AnnouncementListItem[]
   canCreate: boolean
+  canSyncQueue: boolean
 }
 
-export function AnnouncementsList ({ announcements, canCreate }: AnnouncementsListProps) {
+export function AnnouncementsList ({ announcements, canCreate, canSyncQueue }: AnnouncementsListProps) {
   const router = useRouter()
   const [cancelingId, setCancelingId] = useState<string | null>(null)
+  const [isSyncingQueue, setIsSyncingQueue] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [queueMessage, setQueueMessage] = useState<string | null>(null)
+
+  async function handleSyncQueue () {
+    setError(null)
+    setQueueMessage(null)
+    setIsSyncingQueue(true)
+
+    try {
+      const response = await fetch('/api/announcements/sync-queue', { method: 'POST' })
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error ?? 'Não foi possível sincronizar a fila')
+        return
+      }
+
+      setQueueMessage(
+        `${data.data.enqueued} anúncio(s) reenfileirados. Aguarde o worker processar.`
+      )
+      router.refresh()
+    } catch {
+      setError('Erro de conexão ao sincronizar a fila.')
+    } finally {
+      setIsSyncingQueue(false)
+    }
+  }
 
   async function handleCancel (id: string) {
     setError(null)
@@ -63,16 +91,34 @@ export function AnnouncementsList ({ announcements, canCreate }: AnnouncementsLi
             Anúncios agendados e histórico de disparos.
           </p>
         </div>
-        {canCreate && (
-          <Link
-            href="/anuncios/novo"
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Novo anúncio
-          </Link>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {canSyncQueue && (
+            <Button
+              variant="secondary"
+              onClick={handleSyncQueue}
+              disabled={isSyncingQueue}
+            >
+              {isSyncingQueue
+                ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                : null}
+              Reenfileirar pendentes
+            </Button>
+          )}
+          {canCreate && (
+            <Link
+              href="/anuncios/novo"
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Novo anúncio
+            </Link>
+          )}
+        </div>
       </div>
+
+      {queueMessage && (
+        <p className="text-sm text-success" role="status">{queueMessage}</p>
+      )}
 
       {error && (
         <p className="text-sm text-danger" role="alert">{error}</p>
