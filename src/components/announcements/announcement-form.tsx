@@ -28,6 +28,10 @@ interface AnnouncementFormProps {
   maxImageSizeMb: number
 }
 
+function buildInitialTimes (defaultTime: string): string[] {
+  return [defaultTime]
+}
+
 export function AnnouncementForm ({
   sectors,
   groups,
@@ -41,7 +45,8 @@ export function AnnouncementForm ({
   const [groupId, setGroupId] = useState('')
   const [message, setMessage] = useState('')
   const [scheduledDate, setScheduledDate] = useState(defaultDate)
-  const [scheduledTime, setScheduledTime] = useState(defaultTime)
+  const [recurrenceDays, setRecurrenceDays] = useState(1)
+  const [times, setTimes] = useState<string[]>(() => buildInitialTimes(defaultTime))
   const [groupQuery, setGroupQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -51,6 +56,24 @@ export function AnnouncementForm ({
     if (!query) return groups
     return groups.filter(group => group.name.toLowerCase().includes(query))
   }, [groups, groupQuery])
+
+  const totalSlots = recurrenceDays * times.length
+
+  function handleTimesPerDayChange (count: number) {
+    setTimes(current => {
+      const next = [...current]
+
+      while (next.length < count) {
+        next.push('09:00')
+      }
+
+      return next.slice(0, count)
+    })
+  }
+
+  function updateTime (index: number, value: string) {
+    setTimes(current => current.map((time, i) => (i === index ? value : time)))
+  }
 
   async function handleSubmit (event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -63,7 +86,8 @@ export function AnnouncementForm ({
     formData.set('groupId', groupId)
     formData.set('message', message)
     formData.set('scheduledDate', scheduledDate)
-    formData.set('scheduledTime', scheduledTime)
+    formData.set('recurrenceDays', String(recurrenceDays))
+    formData.set('recurrenceTimes', JSON.stringify(times))
 
     try {
       const response = await fetch('/api/announcements', {
@@ -152,28 +176,73 @@ export function AnnouncementForm ({
         />
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="announcement-date">Data</Label>
-          <Input
-            id="announcement-date"
-            type="date"
-            value={scheduledDate}
-            onChange={event => setScheduledDate(event.target.value)}
-            required
-          />
+      <div className="rounded-lg border border-border bg-background/40 p-4 space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold text-text-primary">Agendamento e recorrência</h2>
+          <p className="text-xs text-text-muted mt-1">
+            Defina a data de início, por quantos dias repetir e os horários de cada dia.
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="announcement-date">Data de início</Label>
+            <Input
+              id="announcement-date"
+              type="date"
+              value={scheduledDate}
+              onChange={event => setScheduledDate(event.target.value)}
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="announcement-days">Quantidade de dias</Label>
+            <Input
+              id="announcement-days"
+              type="number"
+              min={1}
+              max={90}
+              value={recurrenceDays}
+              onChange={event => setRecurrenceDays(Number(event.target.value) || 1)}
+              required
+            />
+          </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="announcement-time">Hora</Label>
-          <Input
-            id="announcement-time"
-            type="time"
-            value={scheduledTime}
-            onChange={event => setScheduledTime(event.target.value)}
-            required
-          />
+          <Label htmlFor="announcement-times-count">Horários por dia</Label>
+          <Select
+            id="announcement-times-count"
+            value={String(times.length)}
+            onChange={event => handleTimesPerDayChange(Number(event.target.value))}
+          >
+            {[1, 2, 3, 4, 5].map(count => (
+              <option key={count} value={count}>{count}</option>
+            ))}
+          </Select>
         </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {times.map((time, index) => (
+            <div key={index} className="space-y-2">
+              <Label htmlFor={`announcement-time-${index}`}>
+                {index === 0 ? '1º horário' : `${index + 1}º horário`}
+              </Label>
+              <Input
+                id={`announcement-time-${index}`}
+                type="time"
+                value={time}
+                onChange={event => updateTime(index, event.target.value)}
+                required
+              />
+            </div>
+          ))}
+        </div>
+
+        <p className="text-xs text-text-muted">
+          Total: {totalSlots} disparo{totalSlots === 1 ? '' : 's'} ({recurrenceDays} dia{recurrenceDays === 1 ? '' : 's'} × {times.length} horário{times.length === 1 ? '' : 's'}).
+        </p>
       </div>
 
       <div className="space-y-2">
@@ -201,7 +270,7 @@ export function AnnouncementForm ({
           {isSubmitting
             ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             : <Megaphone className="h-4 w-4" aria-hidden="true" />}
-          Agendar anúncio
+          Agendar {totalSlots > 1 ? `${totalSlots} disparos` : 'anúncio'}
         </Button>
       </div>
     </form>

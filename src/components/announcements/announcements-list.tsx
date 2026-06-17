@@ -20,6 +20,7 @@ export interface AnnouncementListItem {
   participantCount: number
   createdByName: string
   hasImage: boolean
+  seriesId: string | null
 }
 
 interface AnnouncementsListProps {
@@ -110,6 +111,7 @@ export function AnnouncementsList ({ announcements, canCreate }: AnnouncementsLi
                     <p className="mt-1 text-xs text-text-muted">
                       por {item.createdByName}
                       {item.hasImage ? ' · com imagem' : ''}
+                      {item.seriesId ? ' · série recorrente' : ''}
                     </p>
                   </td>
                   <td className="px-4 py-3 text-text-muted">{item.sectorName}</td>
