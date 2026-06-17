@@ -66,10 +66,16 @@ export function GroupsManager ({ initialGroups, canSync }: GroupsManagerProps) {
             {isSyncing
               ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               : <RefreshCw className="h-4 w-4" aria-hidden="true" />}
-            Sincronizar agora
+            {isSyncing ? 'Sincronizando…' : 'Sincronizar agora'}
           </Button>
         )}
       </div>
+
+      {isSyncing && (
+        <p className="text-sm text-text-muted">
+          Pode levar 1–3 minutos se houver muitos grupos no WhatsApp.
+        </p>
+      )}
 
       {groups.length === 0 && (
         <div className="rounded-lg border border-dashed border-border bg-surface p-6 text-sm text-text-muted">

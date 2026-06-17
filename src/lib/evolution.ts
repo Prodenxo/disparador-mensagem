@@ -223,7 +223,7 @@ export async function fetchAllGroups (): Promise<EvolutionGroup[]> {
     try {
       const response = await axios.get(url, {
         headers: headers(),
-        timeout: 30000
+        timeout: 180000
       })
 
       const raw = Array.isArray(response.data)
