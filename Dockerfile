@@ -25,9 +25,11 @@ COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/clie
 COPY --from=builder /app/scripts ./scripts
 RUN npm install prisma@6.19.3 bcryptjs@2.4.3 --no-save \
   && mkdir -p uploads \
+  && sed -i 's/\r$//' ./scripts/docker-entrypoint-web.sh \
   && chmod +x ./scripts/docker-entrypoint-web.sh \
   && chown -R nextjs:nodejs /app
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 CMD ["./scripts/docker-entrypoint-web.sh"]

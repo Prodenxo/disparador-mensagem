@@ -5,5 +5,6 @@ COPY prisma ./prisma
 RUN npm ci || npm install
 COPY . .
 RUN npx prisma generate \
+  && sed -i 's/\r$//' ./scripts/docker-entrypoint-worker.sh \
   && chmod +x ./scripts/docker-entrypoint-worker.sh
 CMD ["./scripts/docker-entrypoint-worker.sh"]
