@@ -57,7 +57,27 @@ function evolutionErrorDetail (error: unknown): string {
   return status ? `${status}: ${error.message}` : error.message
 }
 
-function assertEvolutionSendSuccess (data: unknown, context: string): void {
+function extractMessageKey (data: unknown): { id?: string; remoteJid?: string } | null {
+  if (!data || typeof data !== 'object') return null
+
+  const record = data as Record<string, unknown>
+
+  if (record.key && typeof record.key === 'object') {
+    return record.key as { id?: string; remoteJid?: string }
+  }
+
+  if (record.message && typeof record.message === 'object') {
+    const message = record.message as Record<string, unknown>
+
+    if (message.key && typeof message.key === 'object') {
+      return message.key as { id?: string; remoteJid?: string }
+    }
+  }
+
+  return null
+}
+
+function assertEvolutionSendSuccess (data: unknown, context: string): { id: string; remoteJid: string } {
   if (!data || typeof data !== 'object') {
     throw new Error(`${context}: resposta vazia da Evolution API`)
   }
@@ -73,26 +93,128 @@ function assertEvolutionSendSuccess (data: unknown, context: string): void {
     throw new Error(`${context}: Evolution retornou status ${httpLikeStatus}`)
   }
 
-  const key = record.key
-  if (key && typeof key === 'object' && (key as Record<string, unknown>).id) {
-    return
+  const key = extractMessageKey(record)
+
+  if (!key?.id) {
+    const nestedResponse = record.response
+    if (nestedResponse && typeof nestedResponse === 'object') {
+      const nested = nestedResponse as Record<string, unknown>
+      if (nested.message && !record.messageTimestamp) {
+        throw new Error(`${context}: ${String(nested.message)}`)
+      }
+    }
+
+    if (record.error && typeof record.error === 'string') {
+      throw new Error(`${context}: ${record.error}`)
+    }
+
+    throw new Error(
+      `${context}: Evolution não confirmou o envio. Resposta: ${JSON.stringify(record).slice(0, 400)}`
+    )
   }
 
-  const nestedResponse = record.response
-  if (nestedResponse && typeof nestedResponse === 'object') {
-    const nested = nestedResponse as Record<string, unknown>
-    if (nested.message && !record.messageTimestamp) {
-      throw new Error(`${context}: ${String(nested.message)}`)
+  return {
+    id: String(key.id),
+    remoteJid: String(key.remoteJid || '')
+  }
+}
+
+function buildPrivateSendTargets (recipient: WhatsAppRecipient): string[] {
+  const targets = new Set<string>()
+
+  if (recipient.jid) {
+    targets.add(recipient.jid)
+  }
+
+  targets.add(recipient.number)
+
+  if (!recipient.jid?.includes('@')) {
+    targets.add(`${recipient.number}@s.whatsapp.net`)
+  }
+
+  return Array.from(targets)
+}
+
+function buildPrivateTextPayloads (target: string, text: string): Record<string, unknown>[] {
+  return [
+    { number: target, text, linkPreview: false },
+    { number: target, text, options: { linkPreview: false } },
+    { number: target, text }
+  ]
+}
+
+function buildPrivateMediaPayloads (
+  target: string,
+  base64: string,
+  fileName: string,
+  mimetype: string,
+  caption: string
+): Record<string, unknown>[] {
+  const base = {
+    number: target,
+    mediatype: 'image',
+    mimetype,
+    caption,
+    media: base64,
+    fileName
+  }
+
+  return [
+    base,
+    { ...base, linkPreview: false }
+  ]
+}
+
+async function postPrivateMessage (
+  payloads: Record<string, unknown>[],
+  endpoint: '/message/sendText' | '/message/sendMedia',
+  context: string
+): Promise<{ id: string; remoteJid: string }> {
+  let lastError: unknown
+
+  for (const payload of payloads) {
+    try {
+      const response = await axios.post(
+        instanceUrl(endpoint),
+        payload,
+        { headers: headers(), timeout: 60_000 }
+      )
+
+      const key = assertEvolutionSendSuccess(response.data, context)
+
+      console.log(
+        `[EVOLUTION] ${context} OK (${endpoint}, number=${String(payload.number)}): id=${key.id}, remoteJid=${key.remoteJid}`
+      )
+
+      return key
+    } catch (error) {
+      lastError = error
     }
   }
 
-  if (record.error && typeof record.error === 'string') {
-    throw new Error(`${context}: ${record.error}`)
+  if (lastError instanceof Error) {
+    throw lastError
   }
 
-  throw new Error(
-    `${context}: Evolution não confirmou o envio. Resposta: ${JSON.stringify(record).slice(0, 400)}`
-  )
+  throw new Error(`${context}: falha ao enviar via Evolution`)
+}
+
+export async function assertEvolutionInstanceConnected (): Promise<string> {
+  const response = await axios.get(instanceUrl('/instance/connectionState'), {
+    headers: headers(),
+    timeout: 15_000
+  })
+
+  const data = response.data as Record<string, unknown>
+  const instance = data.instance as Record<string, unknown> | undefined
+  const state = String(instance?.state ?? data.state ?? 'unknown')
+  const owner = String(instance?.owner ?? '')
+
+  if (state !== 'open') {
+    throw new Error(`WhatsApp desconectado na Evolution (state: ${state})`)
+  }
+
+  return owner
 }
 
 export interface WhatsAppRecipient {
@@ -379,23 +501,67 @@ export async function sendTextWithMentions (
   await axios.post(instanceUrl('/message/sendText'), payload, { headers: headers() })
 }
 
+export async function sendTextPrivateToRecipient (
+  recipient: WhatsAppRecipient,
+  text: string
+): Promise<{ messageId: string; remoteJid: string }> {
+  const targets = buildPrivateSendTargets(recipient)
+  let lastError: unknown
+
+  for (const target of targets) {
+    try {
+      return await postPrivateMessage(
+        buildPrivateTextPayloads(target, text),
+        '/message/sendText',
+        `Envio privado para ${target}`
+      )
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  if (lastError instanceof Error) throw lastError
+  throw new Error('Falha ao enviar mensagem privada')
+}
+
+/** @deprecated Use sendTextPrivateToRecipient */
 export async function sendTextPrivate (
   phone: string,
   text: string
 ): Promise<void> {
-  const response = await axios.post(
-    instanceUrl('/message/sendText'),
-    {
-      number: phone,
-      text,
-      options: { linkPreview: false }
-    },
-    { headers: headers() }
+  await sendTextPrivateToRecipient(
+    { number: phone, jid: `${phone.replace(/\D/g, '')}@s.whatsapp.net`, exists: true },
+    text
   )
-
-  assertEvolutionSendSuccess(response.data, `Envio privado para ${phone}`)
 }
 
+export async function sendMediaPrivateFromBase64ToRecipient (
+  recipient: WhatsAppRecipient,
+  base64: string,
+  fileName: string,
+  mimetype: string,
+  caption: string
+): Promise<{ messageId: string; remoteJid: string }> {
+  const targets = buildPrivateSendTargets(recipient)
+  let lastError: unknown
+
+  for (const target of targets) {
+    try {
+      return await postPrivateMessage(
+        buildPrivateMediaPayloads(target, base64, fileName, mimetype, caption),
+        '/message/sendMedia',
+        `Mídia privada para ${target}`
+      )
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  if (lastError instanceof Error) throw lastError
+  throw new Error('Falha ao enviar mídia privada')
+}
+
+/** @deprecated Use sendMediaPrivateFromBase64ToRecipient */
 export async function sendMediaPrivateFromBase64 (
   phone: string,
   base64: string,
@@ -403,44 +569,42 @@ export async function sendMediaPrivateFromBase64 (
   mimetype: string,
   caption: string
 ): Promise<void> {
-  const response = await axios.post(
-    instanceUrl('/message/sendMedia'),
-    {
-      number: phone,
-      mediatype: 'image',
-      mimetype,
-      caption,
-      media: base64,
-      fileName
-    },
-    { headers: headers() }
+  await sendMediaPrivateFromBase64ToRecipient(
+    { number: phone, jid: `${phone.replace(/\D/g, '')}@s.whatsapp.net`, exists: true },
+    base64,
+    fileName,
+    mimetype,
+    caption
   )
-
-  assertEvolutionSendSuccess(response.data, `Mídia privada para ${phone}`)
 }
 
+export async function sendMediaPrivateToRecipient (
+  recipient: WhatsAppRecipient,
+  imagePath: string,
+  caption: string
+): Promise<{ messageId: string; remoteJid: string }> {
+  const base64 = fs.readFileSync(imagePath).toString('base64')
+  const fileName = path.basename(imagePath)
+  return sendMediaPrivateFromBase64ToRecipient(
+    recipient,
+    base64,
+    fileName,
+    'image/jpeg',
+    caption
+  )
+}
+
+/** @deprecated Use sendMediaPrivateToRecipient */
 export async function sendMediaPrivate (
   phone: string,
   imagePath: string,
   caption: string
 ): Promise<void> {
-  const base64 = fs.readFileSync(imagePath).toString('base64')
-  const fileName = path.basename(imagePath)
-
-  const response = await axios.post(
-    instanceUrl('/message/sendMedia'),
-    {
-      number: phone,
-      mediatype: 'image',
-      mimetype: 'image/jpeg',
-      caption,
-      media: base64,
-      fileName
-    },
-    { headers: headers() }
+  await sendMediaPrivateToRecipient(
+    { number: phone, jid: `${phone.replace(/\D/g, '')}@s.whatsapp.net`, exists: true },
+    imagePath,
+    caption
   )
-
-  assertEvolutionSendSuccess(response.data, `Mídia privada para ${phone}`)
 }
 
 export async function sendMediaWithMentionsFromBase64 (

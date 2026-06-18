@@ -1,9 +1,11 @@
 import path from 'path'
 import {
+  assertEvolutionInstanceConnected,
   resolveWhatsAppRecipient,
-  sendMediaPrivate,
-  sendMediaPrivateFromBase64,
-  sendTextPrivate
+  sendMediaPrivateFromBase64ToRecipient,
+  sendMediaPrivateToRecipient,
+  sendTextPrivateToRecipient,
+  type WhatsAppRecipient
 } from '@/lib/evolution'
 import { formatPhoneDisplay, phoneToEvolutionNumber } from '@/lib/phone'
 import { resolveAnnouncementImagePath } from '@/lib/uploads'
@@ -21,11 +23,42 @@ export interface PrivateDispatchInput {
 export interface PrivateDispatchResult {
   targetNumber: string
   displayPhone: string
+  messageId: string
+  remoteJid: string
+  senderJid: string
+}
+
+async function sendToRecipient (
+  recipient: WhatsAppRecipient,
+  input: PrivateDispatchInput
+): Promise<{ messageId: string; remoteJid: string }> {
+  if (input.image?.data) {
+    const extension = input.image.mime.split('/')[1] || 'jpg'
+    const fileName = input.imagePath
+      ? path.basename(input.imagePath)
+      : `image.${extension}`
+
+    return sendMediaPrivateFromBase64ToRecipient(
+      recipient,
+      input.image.data,
+      fileName,
+      input.image.mime,
+      input.message
+    )
+  }
+
+  if (input.imagePath) {
+    const resolvedPath = await resolveAnnouncementImagePath(input.imagePath)
+    return sendMediaPrivateToRecipient(recipient, resolvedPath, input.message)
+  }
+
+  return sendTextPrivateToRecipient(recipient, input.message)
 }
 
 export async function dispatchPrivateMessage (
   input: PrivateDispatchInput
 ): Promise<PrivateDispatchResult> {
+  const senderJid = await assertEvolutionInstanceConnected()
   const recipient = await resolveWhatsAppRecipient(input.phone)
 
   if (!recipient.exists) {
@@ -35,31 +68,15 @@ export async function dispatchPrivateMessage (
     )
   }
 
+  const delivery = await sendToRecipient(recipient, input)
   const targetNumber = recipient.number
-
-  if (input.image?.data) {
-    const extension = input.image.mime.split('/')[1] || 'jpg'
-    const fileName = input.imagePath
-      ? path.basename(input.imagePath)
-      : `image.${extension}`
-
-    await sendMediaPrivateFromBase64(
-      targetNumber,
-      input.image.data,
-      fileName,
-      input.image.mime,
-      input.message
-    )
-  } else if (input.imagePath) {
-    const resolvedPath = await resolveAnnouncementImagePath(input.imagePath)
-    await sendMediaPrivate(targetNumber, resolvedPath, input.message)
-  } else {
-    await sendTextPrivate(targetNumber, input.message)
-  }
 
   return {
     targetNumber,
-    displayPhone: formatPhoneDisplay(targetNumber)
+    displayPhone: formatPhoneDisplay(targetNumber),
+    messageId: delivery.messageId,
+    remoteJid: delivery.remoteJid,
+    senderJid
   }
 }
 

@@ -261,6 +261,8 @@ model PrivateDispatchLog {
   contactId    String
   status       String
   errorMessage String?  @db.Text
+  messageId    String?
+  remoteJid    String?
   sentAt       DateTime @default(now())
 
   campaign PrivateCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)

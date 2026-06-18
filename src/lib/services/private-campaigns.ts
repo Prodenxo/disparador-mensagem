@@ -246,6 +246,8 @@ export async function getPrivateCampaignLogsService (
         select: {
           status: true,
           errorMessage: true,
+          messageId: true,
+          remoteJid: true,
           sentAt: true,
           contact: {
             select: { id: true, name: true, phone: true }

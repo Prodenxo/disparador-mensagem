@@ -10,6 +10,8 @@ import type { AnnouncementStatus } from '@prisma/client'
 export interface PrivateCampaignLogItem {
   status: string
   errorMessage: string | null
+  messageId: string | null
+  remoteJid: string | null
   sentAt: string
   contact: {
     id: string
@@ -62,6 +64,13 @@ export function PrivateCampaignDetail ({ campaign, logs }: PrivateCampaignDetail
         </p>
       )}
 
+      <p className="rounded-lg border border-border bg-background/60 px-4 py-3 text-sm text-text-muted">
+        A mensagem chega <strong className="font-medium text-text-primary">no privado do WhatsApp</strong>, vinda do
+        número conectado na Evolution (<code className="text-xs">central-avisos</code>).
+        Procure esse contato na lista de conversas ou em <strong className="font-medium text-text-primary">Solicitações de mensagem</strong>.
+        Se nunca conversou com esse número, o WhatsApp pode filtrar o aviso.
+      </p>
+
       <div className="overflow-hidden rounded-lg border border-border bg-surface shadow-[var(--shadow-card)]">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-border bg-background/60">
@@ -69,13 +78,14 @@ export function PrivateCampaignDetail ({ campaign, logs }: PrivateCampaignDetail
               <th className="px-4 py-3 font-medium text-text-muted">Contato</th>
               <th className="px-4 py-3 font-medium text-text-muted">Telefone</th>
               <th className="px-4 py-3 font-medium text-text-muted">Resultado</th>
+              <th className="px-4 py-3 font-medium text-text-muted">ID Evolution</th>
               <th className="px-4 py-3 font-medium text-text-muted">Horário</th>
             </tr>
           </thead>
           <tbody>
             {logs.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-text-muted">
+                <td colSpan={5} className="px-4 py-8 text-center text-text-muted">
                   Nenhum registro de envio. A campanha pode ter rodado com lista vazia.
                 </td>
               </tr>
@@ -91,6 +101,14 @@ export function PrivateCampaignDetail ({ campaign, logs }: PrivateCampaignDetail
                       Falhou{log.errorMessage ? `: ${log.errorMessage}` : ''}
                     </span>
                   )}
+                </td>
+                <td className="px-4 py-3 text-xs text-text-muted max-w-[180px] break-all">
+                  {log.messageId ? (
+                    <>
+                      <span className="block">{log.messageId.slice(0, 16)}…</span>
+                      {log.remoteJid && <span className="block">{log.remoteJid}</span>}
+                    </>
+                  ) : '—'}
                 </td>
                 <td className="px-4 py-3 text-text-muted whitespace-nowrap">
                   {format(new Date(log.sentAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}

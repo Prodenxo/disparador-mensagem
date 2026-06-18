@@ -114,7 +114,7 @@ export async function processPrivateCampaign (campaignId: string): Promise<void>
       successCount += 1
 
       console.log(
-        `[WORKER] Campanha privada ${campaignId}: enviado para ${contact.name} (${result.displayPhone})`
+        `[WORKER] Campanha privada ${campaignId}: enviado para ${contact.name} (${result.displayPhone}) id=${result.messageId} remote=${result.remoteJid} from=${result.senderJid}`
       )
 
       if (result.targetNumber !== phoneToEvolutionNumber(contact.phone)) {
@@ -138,11 +138,15 @@ export async function processPrivateCampaign (campaignId: string): Promise<void>
         create: {
           campaignId,
           contactId: contact.id,
-          status: 'SENT'
+          status: 'SENT',
+          messageId: result.messageId,
+          remoteJid: result.remoteJid
         },
         update: {
           status: 'SENT',
           errorMessage: null,
+          messageId: result.messageId,
+          remoteJid: result.remoteJid,
           sentAt: new Date()
         }
       })

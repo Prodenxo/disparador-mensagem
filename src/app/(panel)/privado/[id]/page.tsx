@@ -65,6 +65,8 @@ export default async function PrivadoCampanhaDetailPage ({
       logs={logsData.logs.map(log => ({
         status: log.status,
         errorMessage: log.errorMessage,
+        messageId: log.messageId,
+        remoteJid: log.remoteJid,
         sentAt: log.sentAt.toISOString(),
         contact: log.contact
       }))}
