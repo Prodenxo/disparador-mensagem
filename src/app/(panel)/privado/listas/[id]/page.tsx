@@ -19,7 +19,7 @@ export default async function PrivadoListaDetailPage ({
   const { id } = await params
   const result = await getContactListMembersService(session, id)
 
-  if (!result.success) {
+  if (!result.success || !result.data) {
     notFound()
   }
 
