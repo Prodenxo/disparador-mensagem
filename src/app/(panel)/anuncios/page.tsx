@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth/session'
 import { canCreateAnnouncement, isSuperAdmin } from '@/lib/permissions'
+import { reconcileAnnouncementStatuses } from '@/lib/queue/announcement-sync'
 import { listAnnouncementsService } from '@/lib/services/announcements'
 import { AnnouncementsList } from '@/components/announcements/announcements-list'
 
@@ -10,6 +11,8 @@ export default async function AnunciosPage () {
   if (!session) {
     redirect('/login')
   }
+
+  await reconcileAnnouncementStatuses()
 
   const announcements = await listAnnouncementsService(session)
   const canCreate = isSuperAdmin(session)

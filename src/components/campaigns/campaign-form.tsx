@@ -57,7 +57,7 @@ export function CampaignForm ({
   const [message, setMessage] = useState(initialValues.message)
   const [mentionAll, setMentionAll] = useState(initialValues.mentionAll)
   const [active, setActive] = useState(initialValues.active)
-  const [intervalValue, setIntervalValue] = useState(initialValues.intervalValue)
+  const [intervalValue, setIntervalValue] = useState(String(initialValues.intervalValue))
   const [intervalUnit, setIntervalUnit] = useState<'minutes' | 'hours'>(initialValues.intervalUnit)
   const [removeImage, setRemoveImage] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -72,6 +72,13 @@ export function CampaignForm ({
       return
     }
 
+    const parsedInterval = Number(intervalValue)
+
+    if (!intervalValue.trim() || Number.isNaN(parsedInterval) || parsedInterval < 1) {
+      setError('Informe um intervalo válido (mínimo 1)')
+      return
+    }
+
     setIsSubmitting(true)
 
     const form = event.currentTarget
@@ -82,7 +89,7 @@ export function CampaignForm ({
     formData.set('message', message)
     formData.set('mentionAll', mentionAll ? 'true' : 'false')
     formData.set('active', active ? 'true' : 'false')
-    formData.set('intervalValue', String(intervalValue))
+    formData.set('intervalValue', intervalValue.trim())
     formData.set('intervalUnit', intervalUnit)
     formData.set('removeImage', removeImage ? 'true' : 'false')
 
@@ -216,8 +223,9 @@ export function CampaignForm ({
               type="number"
               min={1}
               max={intervalUnit === 'hours' ? 168 : 10080}
+              inputMode="numeric"
               value={intervalValue}
-              onChange={event => setIntervalValue(Number(event.target.value) || 1)}
+              onChange={event => setIntervalValue(event.target.value)}
               required
             />
           </div>

@@ -1,26 +1,36 @@
 import Link from 'next/link'
 import { AlertTriangle, CalendarClock, CheckCircle2, Megaphone } from 'lucide-react'
 import { getSession } from '@/lib/auth/session'
+import { getTimezoneDayRange } from '@/lib/datetime/timezone-range'
 import { canCreateAnnouncement, isSuperAdmin } from '@/lib/permissions'
 import { prisma } from '@/lib/prisma'
+import { reconcileAnnouncementStatuses } from '@/lib/queue/announcement-sync'
 
-async function getDashboardStats (userId: string, isAdmin: boolean, sectorIds: string[] | 'all') {
+async function getDashboardStats (sectorIds: string[] | 'all') {
   const sectorFilter = sectorIds === 'all'
     ? {}
     : { sectorId: { in: sectorIds } }
 
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
+  const { todayStart, tomorrowStart } = getTimezoneDayRange()
 
-  const tomorrowStart = new Date(todayStart)
-  tomorrowStart.setDate(tomorrowStart.getDate() + 1)
-
-  const [scheduledToday, recentSent, recentFailed] = await Promise.all([
+  const [scheduledToday, sentToday, totalSent, recentFailed] = await Promise.all([
     prisma.announcement.count({
       where: {
         ...sectorFilter,
         status: 'SCHEDULED',
         scheduledAt: { gte: todayStart, lt: tomorrowStart }
+      }
+    }),
+    prisma.announcement.count({
+      where: {
+        ...sectorFilter,
+        status: 'SENT',
+        logs: {
+          some: {
+            status: 'SENT',
+            sentAt: { gte: todayStart, lt: tomorrowStart }
+          }
+        }
       }
     }),
     prisma.announcement.count({
@@ -37,10 +47,7 @@ async function getDashboardStats (userId: string, isAdmin: boolean, sectorIds: s
     })
   ])
 
-  void userId
-  void isAdmin
-
-  return { scheduledToday, recentSent, recentFailed }
+  return { scheduledToday, sentToday, totalSent, recentFailed }
 }
 
 export default async function DashboardPage () {
@@ -48,9 +55,11 @@ export default async function DashboardPage () {
 
   if (!session) return null
 
+  await reconcileAnnouncementStatuses()
+
   const superAdmin = isSuperAdmin(session)
   const sectorIds = superAdmin ? 'all' as const : session.sectors.map(link => link.sectorId)
-  const stats = await getDashboardStats(session.id, superAdmin, sectorIds)
+  const stats = await getDashboardStats(sectorIds)
 
   const canCreate = superAdmin || session.sectors.some(link =>
     canCreateAnnouncement(session, link.sectorId)
@@ -81,7 +90,7 @@ export default async function DashboardPage () {
         )}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         <article className="rounded-lg border border-border bg-surface p-5 shadow-[var(--shadow-card)]">
           <div className="mb-3 flex items-center gap-2 text-warning">
             <CalendarClock className="h-5 w-5" aria-hidden="true" />
@@ -93,9 +102,17 @@ export default async function DashboardPage () {
         <article className="rounded-lg border border-border bg-surface p-5 shadow-[var(--shadow-card)]">
           <div className="mb-3 flex items-center gap-2 text-success">
             <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
-            <span className="text-sm font-medium">Enviados</span>
+            <span className="text-sm font-medium">Concluídos hoje</span>
           </div>
-          <p className="text-3xl font-semibold text-text-primary">{stats.recentSent}</p>
+          <p className="text-3xl font-semibold text-text-primary">{stats.sentToday}</p>
+        </article>
+
+        <article className="rounded-lg border border-border bg-surface p-5 shadow-[var(--shadow-card)]">
+          <div className="mb-3 flex items-center gap-2 text-success">
+            <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+            <span className="text-sm font-medium">Total concluídos</span>
+          </div>
+          <p className="text-3xl font-semibold text-text-primary">{stats.totalSent}</p>
         </article>
 
         <article className="rounded-lg border border-border bg-surface p-5 shadow-[var(--shadow-card)]">
@@ -106,14 +123,6 @@ export default async function DashboardPage () {
           <p className="text-3xl font-semibold text-text-primary">{stats.recentFailed}</p>
         </article>
       </div>
-
-      <section className="rounded-lg border border-border bg-surface p-6 shadow-[var(--shadow-card)]">
-        <h2 className="text-lg font-semibold text-text-primary">Próximos passos</h2>
-        <p className="mt-2 text-sm text-text-muted">
-          Autenticação e layout base prontos. Em seguida: CRUD de setores/usuários,
-          sync de grupos, formulário de anúncios e histórico completo.
-        </p>
-      </section>
     </div>
   )
 }

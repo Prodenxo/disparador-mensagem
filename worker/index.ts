@@ -62,6 +62,9 @@ void Promise.all([
 ])
   .then(([announcements, campaigns]) => {
     console.log(
+      `[WORKER] Reconciliação: ${announcements.reconciled.fixedFromLogs} status corrigidos, ${announcements.reconciled.requeuedOverdue} atrasados reenfileirados, ${announcements.reconciled.resetStuckProcessing} processamentos travados`
+    )
+    console.log(
       `[WORKER] Fila sincronizada: ${announcements.enqueued} anúncios reenfileirados, ${announcements.skipped} já na fila, ${announcements.total} agendados no banco`
     )
     console.log(

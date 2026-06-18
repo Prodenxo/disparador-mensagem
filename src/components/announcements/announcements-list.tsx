@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -37,6 +37,23 @@ export function AnnouncementsList ({ announcements, canCreate, canSyncQueue }: A
   const [error, setError] = useState<string | null>(null)
   const [queueMessage, setQueueMessage] = useState<string | null>(null)
 
+  const shouldAutoRefresh = useMemo(() => (
+    announcements.some(item =>
+      item.status === 'PROCESSING'
+      || (item.status === 'SCHEDULED' && new Date(item.scheduledAt).getTime() <= Date.now() + 60_000)
+    )
+  ), [announcements])
+
+  useEffect(() => {
+    if (!shouldAutoRefresh) return
+
+    const interval = setInterval(() => {
+      router.refresh()
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [shouldAutoRefresh, router])
+
   async function handleSyncQueue () {
     setError(null)
     setQueueMessage(null)
@@ -51,8 +68,21 @@ export function AnnouncementsList ({ announcements, canCreate, canSyncQueue }: A
         return
       }
 
+      const { enqueued, reconciled } = data.data
+      const parts: string[] = []
+
+      if (reconciled?.fixedFromLogs > 0) {
+        parts.push(`${reconciled.fixedFromLogs} status corrigido(s)`)
+      }
+
+      if (enqueued > 0) {
+        parts.push(`${enqueued} anúncio(s) reenfileirado(s)`)
+      }
+
       setQueueMessage(
-        `${data.data.enqueued} anúncio(s) reenfileirados. Aguarde o worker processar.`
+        parts.length > 0
+          ? `${parts.join(', ')}. A lista atualiza automaticamente.`
+          : 'Fila já estava sincronizada.'
       )
       router.refresh()
     } catch {

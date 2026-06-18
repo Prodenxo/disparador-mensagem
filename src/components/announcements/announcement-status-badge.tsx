@@ -5,7 +5,7 @@ const statusConfig: Record<AnnouncementStatus, { label: string; variant: 'defaul
   DRAFT: { label: 'Rascunho', variant: 'muted' },
   SCHEDULED: { label: 'Agendado', variant: 'warning' },
   PROCESSING: { label: 'Enviando', variant: 'default' },
-  SENT: { label: 'Enviado', variant: 'success' },
+  SENT: { label: 'Concluído', variant: 'success' },
   FAILED: { label: 'Falhou', variant: 'danger' },
   CANCELLED: { label: 'Cancelado', variant: 'muted' }
 }
