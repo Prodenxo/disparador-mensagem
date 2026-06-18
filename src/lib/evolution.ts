@@ -77,7 +77,7 @@ function extractMessageKey (data: unknown): { id?: string; remoteJid?: string } 
   return null
 }
 
-function assertEvolutionSendSuccess (data: unknown, context: string): { id: string; remoteJid: string } {
+function assertEvolutionSendSuccess (data: unknown, context: string): { messageId: string; remoteJid: string } {
   if (!data || typeof data !== 'object') {
     throw new Error(`${context}: resposta vazia da Evolution API`)
   }
@@ -114,7 +114,7 @@ function assertEvolutionSendSuccess (data: unknown, context: string): { id: stri
   }
 
   return {
-    id: String(key.id),
+    messageId: String(key.id),
     remoteJid: String(key.remoteJid || '')
   }
 }
@@ -169,7 +169,7 @@ async function postPrivateMessage (
   payloads: Record<string, unknown>[],
   endpoint: '/message/sendText' | '/message/sendMedia',
   context: string
-): Promise<{ id: string; remoteJid: string }> {
+): Promise<{ messageId: string; remoteJid: string }> {
   let lastError: unknown
 
   for (const payload of payloads) {
@@ -183,7 +183,7 @@ async function postPrivateMessage (
       const key = assertEvolutionSendSuccess(response.data, context)
 
       console.log(
-        `[EVOLUTION] ${context} OK (${endpoint}, number=${String(payload.number)}): id=${key.id}, remoteJid=${key.remoteJid}`
+        `[EVOLUTION] ${context} OK (${endpoint}, number=${String(payload.number)}): id=${key.messageId}, remoteJid=${key.remoteJid}`
       )
 
       return key
