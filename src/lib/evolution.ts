@@ -2,6 +2,7 @@ import axios from 'axios'
 import fs from 'fs'
 import path from 'path'
 import { env } from './env'
+import { brazilMobileVariants, phoneToEvolutionNumber } from './phone'
 import { LidMapService } from './lid-map'
 import {
   applyMentionsToPayload,
@@ -54,6 +55,85 @@ function evolutionErrorDetail (error: unknown): string {
   }
 
   return status ? `${status}: ${error.message}` : error.message
+}
+
+function assertEvolutionSendSuccess (data: unknown, context: string): void {
+  if (!data || typeof data !== 'object') {
+    throw new Error(`${context}: resposta vazia da Evolution API`)
+  }
+
+  const record = data as Record<string, unknown>
+
+  if (record.success === false) {
+    throw new Error(`${context}: ${String(record.error ?? record.message ?? 'Evolution rejeitou o envio')}`)
+  }
+
+  const httpLikeStatus = Number(record.status)
+  if (!Number.isNaN(httpLikeStatus) && httpLikeStatus >= 400) {
+    throw new Error(`${context}: Evolution retornou status ${httpLikeStatus}`)
+  }
+
+  const key = record.key
+  if (key && typeof key === 'object' && (key as Record<string, unknown>).id) {
+    return
+  }
+
+  const nestedResponse = record.response
+  if (nestedResponse && typeof nestedResponse === 'object') {
+    const nested = nestedResponse as Record<string, unknown>
+    if (nested.message && !record.messageTimestamp) {
+      throw new Error(`${context}: ${String(nested.message)}`)
+    }
+  }
+
+  if (record.error && typeof record.error === 'string') {
+    throw new Error(`${context}: ${record.error}`)
+  }
+
+  throw new Error(
+    `${context}: Evolution não confirmou o envio. Resposta: ${JSON.stringify(record).slice(0, 400)}`
+  )
+}
+
+export interface WhatsAppRecipient {
+  number: string
+  jid: string | null
+  exists: boolean
+}
+
+export async function resolveWhatsAppRecipient (rawPhone: string): Promise<WhatsAppRecipient> {
+  const candidates = brazilMobileVariants(rawPhone)
+
+  for (const candidate of candidates) {
+    try {
+      const response = await axios.post(
+        instanceUrl('/chat/whatsappNumbers'),
+        { numbers: [candidate] },
+        { headers: headers(), timeout: 15000 }
+      )
+
+      const list = Array.isArray(response.data) ? response.data : []
+
+      for (const item of list) {
+        const row = item as Record<string, unknown>
+
+        if (row.exists !== true) continue
+
+        const number = String(row.number || candidate)
+        const jid = typeof row.jid === 'string' ? row.jid : null
+
+        return { number, jid, exists: true }
+      }
+    } catch {
+      continue
+    }
+  }
+
+  return {
+    number: phoneToEvolutionNumber(rawPhone),
+    jid: null,
+    exists: false
+  }
 }
 
 async function fetchEvolutionInstanceNames (): Promise<string[]> {
@@ -303,7 +383,7 @@ export async function sendTextPrivate (
   phone: string,
   text: string
 ): Promise<void> {
-  await axios.post(
+  const response = await axios.post(
     instanceUrl('/message/sendText'),
     {
       number: phone,
@@ -312,6 +392,8 @@ export async function sendTextPrivate (
     },
     { headers: headers() }
   )
+
+  assertEvolutionSendSuccess(response.data, `Envio privado para ${phone}`)
 }
 
 export async function sendMediaPrivateFromBase64 (
@@ -321,7 +403,7 @@ export async function sendMediaPrivateFromBase64 (
   mimetype: string,
   caption: string
 ): Promise<void> {
-  await axios.post(
+  const response = await axios.post(
     instanceUrl('/message/sendMedia'),
     {
       number: phone,
@@ -333,6 +415,8 @@ export async function sendMediaPrivateFromBase64 (
     },
     { headers: headers() }
   )
+
+  assertEvolutionSendSuccess(response.data, `Mídia privada para ${phone}`)
 }
 
 export async function sendMediaPrivate (
@@ -343,7 +427,7 @@ export async function sendMediaPrivate (
   const base64 = fs.readFileSync(imagePath).toString('base64')
   const fileName = path.basename(imagePath)
 
-  await axios.post(
+  const response = await axios.post(
     instanceUrl('/message/sendMedia'),
     {
       number: phone,
@@ -355,6 +439,8 @@ export async function sendMediaPrivate (
     },
     { headers: headers() }
   )
+
+  assertEvolutionSendSuccess(response.data, `Mídia privada para ${phone}`)
 }
 
 export async function sendMediaWithMentionsFromBase64 (

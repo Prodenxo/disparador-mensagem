@@ -34,3 +34,18 @@ export function formatPhoneDisplay (phone: string): string {
 export function phoneToEvolutionNumber (phone: string): string {
   return phone.replace(/\D/g, '')
 }
+
+export function brazilMobileVariants (phone: string): string[] {
+  const digits = phoneToEvolutionNumber(phone)
+  const variants = new Set<string>([digits])
+
+  if (digits.startsWith(BRAZIL_COUNTRY_CODE) && digits.length === 12) {
+    variants.add(`${digits.slice(0, 4)}9${digits.slice(4)}`)
+  }
+
+  if (digits.startsWith(BRAZIL_COUNTRY_CODE) && digits.length === 13 && digits.charAt(4) === '9') {
+    variants.add(`${digits.slice(0, 4)}${digits.slice(5)}`)
+  }
+
+  return Array.from(variants)
+}

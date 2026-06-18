@@ -1,10 +1,11 @@
 import path from 'path'
 import {
+  resolveWhatsAppRecipient,
   sendMediaPrivate,
   sendMediaPrivateFromBase64,
   sendTextPrivate
 } from '@/lib/evolution'
-import { phoneToEvolutionNumber } from '@/lib/phone'
+import { formatPhoneDisplay, phoneToEvolutionNumber } from '@/lib/phone'
 import { resolveAnnouncementImagePath } from '@/lib/uploads'
 
 export interface PrivateDispatchInput {
@@ -17,8 +18,24 @@ export interface PrivateDispatchInput {
   } | null
 }
 
-export async function dispatchPrivateMessage (input: PrivateDispatchInput): Promise<void> {
-  const number = phoneToEvolutionNumber(input.phone)
+export interface PrivateDispatchResult {
+  targetNumber: string
+  displayPhone: string
+}
+
+export async function dispatchPrivateMessage (
+  input: PrivateDispatchInput
+): Promise<PrivateDispatchResult> {
+  const recipient = await resolveWhatsAppRecipient(input.phone)
+
+  if (!recipient.exists) {
+    const display = formatPhoneDisplay(phoneToEvolutionNumber(input.phone))
+    throw new Error(
+      `O número ${display} não foi encontrado no WhatsApp. Confira DDD e o 9 do celular.`
+    )
+  }
+
+  const targetNumber = recipient.number
 
   if (input.image?.data) {
     const extension = input.image.mime.split('/')[1] || 'jpg'
@@ -27,22 +44,23 @@ export async function dispatchPrivateMessage (input: PrivateDispatchInput): Prom
       : `image.${extension}`
 
     await sendMediaPrivateFromBase64(
-      number,
+      targetNumber,
       input.image.data,
       fileName,
       input.image.mime,
       input.message
     )
-    return
-  }
-
-  if (input.imagePath) {
+  } else if (input.imagePath) {
     const resolvedPath = await resolveAnnouncementImagePath(input.imagePath)
-    await sendMediaPrivate(number, resolvedPath, input.message)
-    return
+    await sendMediaPrivate(targetNumber, resolvedPath, input.message)
+  } else {
+    await sendTextPrivate(targetNumber, input.message)
   }
 
-  await sendTextPrivate(number, input.message)
+  return {
+    targetNumber,
+    displayPhone: formatPhoneDisplay(targetNumber)
+  }
 }
 
 export function sleep (ms: number): Promise<void> {

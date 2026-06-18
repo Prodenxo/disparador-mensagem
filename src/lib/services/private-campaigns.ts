@@ -268,3 +268,15 @@ export async function getPrivateCampaignLogsService (
 export function formatScheduleLabel (date: Date): string {
   return formatInTimeZone(date, env.timezone, 'dd/MM/yyyy HH:mm')
 }
+
+export async function reconcilePrivateCampaignStatuses (): Promise<number> {
+  const updated = await prisma.privateCampaign.updateMany({
+    where: {
+      status: 'SENT',
+      logs: { none: {} }
+    },
+    data: { status: 'FAILED' }
+  })
+
+  return updated.count
+}

@@ -165,6 +165,9 @@ export function PrivateCampaignsList ({ campaigns, canCreate }: PrivateCampaigns
                   </td>
                   <td className="px-4 py-3 text-text-muted whitespace-nowrap">
                     {item.sentCount} enviados
+                    {item.sentCount === 0 && item.status === 'SENT' && (
+                      <span className="block text-xs text-warning">Nenhum envio registrado</span>
+                    )}
                     {item.failedCount > 0 && (
                       <span className="block text-xs text-danger">{item.failedCount} falhas</span>
                     )}
@@ -173,19 +176,27 @@ export function PrivateCampaignsList ({ campaigns, canCreate }: PrivateCampaigns
                     <AnnouncementStatusBadge status={item.status} />
                   </td>
                   <td className="px-4 py-3">
-                    {item.status === 'SCHEDULED' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCancel(item.id)}
-                        disabled={cancelingId === item.id}
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        href={`/privado/${item.id}`}
+                        className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-text-primary hover:bg-background"
                       >
-                        {cancelingId === item.id
-                          ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                          : <XCircle className="h-4 w-4" aria-hidden="true" />}
-                        Cancelar
-                      </Button>
-                    )}
+                        Detalhes
+                      </Link>
+                      {item.status === 'SCHEDULED' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCancel(item.id)}
+                          disabled={cancelingId === item.id}
+                        >
+                          {cancelingId === item.id
+                            ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                            : <XCircle className="h-4 w-4" aria-hidden="true" />}
+                          Cancelar
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

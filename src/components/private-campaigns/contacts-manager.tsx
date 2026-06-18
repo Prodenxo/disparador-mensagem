@@ -187,6 +187,7 @@ export function ContactsManager ({
             <div className="space-y-2">
               <Label htmlFor="contact-phone">Telefone</Label>
               <Input id="contact-phone" value={phone} onChange={e => setPhone(e.target.value)} placeholder="11999998888" required />
+              <p className="text-xs text-text-muted">Celular com DDD e o 9 (ex.: 11999998888)</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="contact-sector">Setor</Label>

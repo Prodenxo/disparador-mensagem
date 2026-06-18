@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import type { AnnouncementStatus } from '@prisma/client'
 import { getSession } from '@/lib/auth/session'
 import { canCreateAnnouncement, isSuperAdmin } from '@/lib/permissions'
-import { listPrivateCampaignsService } from '@/lib/services/private-campaigns'
+import { listPrivateCampaignsService, reconcilePrivateCampaignStatuses } from '@/lib/services/private-campaigns'
 import { PrivateCampaignsList } from '@/components/private-campaigns/private-campaigns-list'
 
 export default async function PrivadoPage () {
@@ -11,6 +11,8 @@ export default async function PrivadoPage () {
   if (!session) {
     redirect('/login')
   }
+
+  await reconcilePrivateCampaignStatuses()
 
   const campaigns = await listPrivateCampaignsService(session)
   const canCreate = isSuperAdmin(session)

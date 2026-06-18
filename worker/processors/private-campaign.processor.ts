@@ -1,6 +1,13 @@
 import { PrivateCampaignStatus } from '@prisma/client'
 import { dispatchPrivateMessage, sleep } from '../../src/lib/dispatch/send-private-message'
+import { phoneToEvolutionNumber } from '../../src/lib/phone'
 import { prisma } from '../../src/lib/prisma'
+
+function maskPhone (phone: string): string {
+  const digits = phone.replace(/\D/g, '')
+  if (digits.length <= 4) return digits
+  return `***${digits.slice(-4)}`
+}
 
 export async function processPrivateCampaign (campaignId: string): Promise<void> {
   const campaign = await prisma.privateCampaign.findUnique({
@@ -27,6 +34,12 @@ export async function processPrivateCampaign (campaignId: string): Promise<void>
     return
   }
 
+  const totalMembers = campaign.list.members.length
+
+  console.log(
+    `[WORKER] Campanha privada ${campaignId}: lista "${campaign.list.name}" com ${totalMembers} contato(s)`
+  )
+
   await prisma.privateCampaign.update({
     where: { id: campaignId },
     data: { status: PrivateCampaignStatus.PROCESSING }
@@ -45,6 +58,30 @@ export async function processPrivateCampaign (campaignId: string): Promise<void>
     .map(member => member.contact)
     .filter(contact => !sentContactIds.has(contact.id))
 
+  if (contacts.length === 0 && sentContactIds.size === 0) {
+    console.error(`[WORKER] Campanha privada ${campaignId}: nenhum contato na lista`)
+
+    await prisma.privateCampaign.update({
+      where: { id: campaignId },
+      data: { status: PrivateCampaignStatus.FAILED }
+    })
+
+    return
+  }
+
+  if (contacts.length === 0) {
+    console.log(
+      `[WORKER] Campanha privada ${campaignId}: ${sentContactIds.size} contato(s) já enviados anteriormente`
+    )
+
+    await prisma.privateCampaign.update({
+      where: { id: campaignId },
+      data: { status: PrivateCampaignStatus.SENT }
+    })
+
+    return
+  }
+
   let failureCount = 0
   let successCount = 0
 
@@ -60,8 +97,12 @@ export async function processPrivateCampaign (campaignId: string): Promise<void>
 
     const contact = contacts[index]
 
+    console.log(
+      `[WORKER] Campanha privada ${campaignId}: enviando para ${contact.name} (${maskPhone(contact.phone)})`
+    )
+
     try {
-      await dispatchPrivateMessage({
+      const result = await dispatchPrivateMessage({
         phone: contact.phone,
         message: campaign.message,
         imagePath: campaign.imagePath,
@@ -71,6 +112,21 @@ export async function processPrivateCampaign (campaignId: string): Promise<void>
       })
 
       successCount += 1
+
+      console.log(
+        `[WORKER] Campanha privada ${campaignId}: enviado para ${contact.name} (${result.displayPhone})`
+      )
+
+      if (result.targetNumber !== phoneToEvolutionNumber(contact.phone)) {
+        await prisma.contact.update({
+          where: { id: contact.id },
+          data: { phone: result.targetNumber }
+        })
+
+        console.log(
+          `[WORKER] Campanha privada ${campaignId}: telefone corrigido para ${result.displayPhone}`
+        )
+      }
 
       await prisma.privateDispatchLog.upsert({
         where: {
@@ -93,6 +149,10 @@ export async function processPrivateCampaign (campaignId: string): Promise<void>
     } catch (error) {
       failureCount += 1
       const message = error instanceof Error ? error.message : 'Erro desconhecido'
+
+      console.error(
+        `[WORKER] Campanha privada ${campaignId}: falha para ${contact.name} (${maskPhone(contact.phone)}): ${message}`
+      )
 
       await prisma.privateDispatchLog.upsert({
         where: {
@@ -129,4 +189,8 @@ export async function processPrivateCampaign (campaignId: string): Promise<void>
     where: { id: campaignId },
     data: { status: finalStatus }
   })
+
+  console.log(
+    `[WORKER] Campanha privada ${campaignId} finalizada: ${successCount} enviados, ${failureCount} falhas, status ${finalStatus}`
+  )
 }
