@@ -26,33 +26,52 @@ export interface PrivateDispatchResult {
   messageId: string
   remoteJid: string
   senderJid: string
+  sentText: boolean
+  sentImage: boolean
 }
 
-async function sendToRecipient (
+function normalizeDelivery (
+  delivery: { messageId?: string; id?: string; remoteJid?: string }
+): { messageId: string; remoteJid: string } {
+  const messageId = delivery.messageId || delivery.id || ''
+
+  if (!messageId) {
+    throw new Error('Evolution não retornou ID da mensagem')
+  }
+
+  return {
+    messageId,
+    remoteJid: delivery.remoteJid || ''
+  }
+}
+
+async function sendOptionalImage (
   recipient: WhatsAppRecipient,
   input: PrivateDispatchInput
-): Promise<{ messageId: string; remoteJid: string }> {
+): Promise<boolean> {
   if (input.image?.data) {
     const extension = input.image.mime.split('/')[1] || 'jpg'
     const fileName = input.imagePath
       ? path.basename(input.imagePath)
       : `image.${extension}`
 
-    return sendMediaPrivateFromBase64ToRecipient(
+    await sendMediaPrivateFromBase64ToRecipient(
       recipient,
       input.image.data,
       fileName,
       input.image.mime,
-      input.message
+      ''
     )
+    return true
   }
 
   if (input.imagePath) {
     const resolvedPath = await resolveAnnouncementImagePath(input.imagePath)
-    return sendMediaPrivateToRecipient(recipient, resolvedPath, input.message)
+    await sendMediaPrivateToRecipient(recipient, resolvedPath, '')
+    return true
   }
 
-  return sendTextPrivateToRecipient(recipient, input.message)
+  return false
 }
 
 export async function dispatchPrivateMessage (
@@ -68,15 +87,38 @@ export async function dispatchPrivateMessage (
     )
   }
 
-  const delivery = await sendToRecipient(recipient, input)
-  const targetNumber = recipient.number
+  const hasImage = Boolean(input.image?.data || input.imagePath)
+
+  console.log(
+    `[PRIVATE] Enviando para ${formatPhoneDisplay(recipient.number)} (texto${hasImage ? ' + imagem' : ''})`
+  )
+
+  const textDelivery = normalizeDelivery(
+    await sendTextPrivateToRecipient(recipient, input.message)
+  )
+
+  let sentImage = false
+
+  if (hasImage) {
+    try {
+      sentImage = await sendOptionalImage(recipient, input)
+      console.log(`[PRIVATE] Imagem enviada para ${formatPhoneDisplay(recipient.number)}`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.warn(
+        `[PRIVATE] Texto enviado, mas imagem falhou para ${formatPhoneDisplay(recipient.number)}: ${message}`
+      )
+    }
+  }
 
   return {
-    targetNumber,
-    displayPhone: formatPhoneDisplay(targetNumber),
-    messageId: delivery.messageId,
-    remoteJid: delivery.remoteJid,
-    senderJid
+    targetNumber: recipient.number,
+    displayPhone: formatPhoneDisplay(recipient.number),
+    messageId: textDelivery.messageId,
+    remoteJid: textDelivery.remoteJid,
+    senderJid,
+    sentText: true,
+    sentImage
   }
 }
 

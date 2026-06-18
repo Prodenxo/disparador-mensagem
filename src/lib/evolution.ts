@@ -120,26 +120,22 @@ function assertEvolutionSendSuccess (data: unknown, context: string): { messageI
 }
 
 function buildPrivateSendTargets (recipient: WhatsAppRecipient): string[] {
-  const targets = new Set<string>()
+  return [phoneToEvolutionNumber(recipient.number)]
+}
 
-  if (recipient.jid) {
-    targets.add(recipient.jid)
-  }
-
-  targets.add(recipient.number)
-
-  if (!recipient.jid?.includes('@')) {
-    targets.add(`${recipient.number}@s.whatsapp.net`)
-  }
-
-  return Array.from(targets)
+function sanitizeBase64Media (raw: string): string {
+  const trimmed = raw.trim()
+  const dataUrlMatch = trimmed.match(/^data:[^;]+;base64,(.+)$/i)
+  return (dataUrlMatch ? dataUrlMatch[1] : trimmed).replace(/\s/g, '')
 }
 
 function buildPrivateTextPayloads (target: string, text: string): Record<string, unknown>[] {
+  const digits = phoneToEvolutionNumber(target)
+
   return [
-    { number: target, text, linkPreview: false },
-    { number: target, text, options: { linkPreview: false } },
-    { number: target, text }
+    { number: digits, text, linkPreview: false },
+    { number: digits, text, options: { linkPreview: false } },
+    { number: digits, text }
   ]
 }
 
@@ -150,18 +146,21 @@ function buildPrivateMediaPayloads (
   mimetype: string,
   caption: string
 ): Record<string, unknown>[] {
+  const media = sanitizeBase64Media(base64)
+  const digits = phoneToEvolutionNumber(target)
+
   const base = {
-    number: target,
+    number: digits,
     mediatype: 'image',
     mimetype,
     caption,
-    media: base64,
+    media,
     fileName
   }
 
   return [
     base,
-    { ...base, linkPreview: false }
+    { ...base, number: target.replace(/@.+$/, '') || digits }
   ]
 }
 
@@ -208,7 +207,13 @@ export async function assertEvolutionInstanceConnected (): Promise<string> {
   const data = response.data as Record<string, unknown>
   const instance = data.instance as Record<string, unknown> | undefined
   const state = String(instance?.state ?? data.state ?? 'unknown')
-  const owner = String(instance?.owner ?? '')
+  const owner = String(
+    instance?.owner
+    ?? instance?.wuid
+    ?? data.owner
+    ?? data.wuid
+    ?? ''
+  )
 
   if (state !== 'open') {
     throw new Error(`WhatsApp desconectado na Evolution (state: ${state})`)
@@ -241,8 +246,16 @@ export async function resolveWhatsAppRecipient (rawPhone: string): Promise<Whats
 
         if (row.exists !== true) continue
 
-        const number = String(row.number || candidate)
-        const jid = typeof row.jid === 'string' ? row.jid : null
+        let number = phoneToEvolutionNumber(String(row.number || candidate))
+        let jid = typeof row.jid === 'string' ? row.jid : null
+
+        if (jid?.includes('@lid')) {
+          const resolved = await resolveJid(jid)
+          if (resolved.includes('@s.whatsapp.net')) {
+            jid = resolved
+            number = phoneToEvolutionNumber(resolved)
+          }
+        }
 
         return { number, jid, exists: true }
       }

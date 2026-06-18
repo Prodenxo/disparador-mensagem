@@ -68,7 +68,8 @@ export function PrivateCampaignDetail ({ campaign, logs }: PrivateCampaignDetail
         A mensagem chega <strong className="font-medium text-text-primary">no privado do WhatsApp</strong>, vinda do
         número conectado na Evolution (<code className="text-xs">central-avisos</code>).
         Procure esse contato na lista de conversas ou em <strong className="font-medium text-text-primary">Solicitações de mensagem</strong>.
-        Se nunca conversou com esse número, o WhatsApp pode filtrar o aviso.
+        Envie um &quot;oi&quot; para esse número antes do teste — o WhatsApp costuma bloquear o primeiro contato frio.
+        Campanhas com imagem enviam <strong className="font-medium text-text-primary">texto primeiro</strong>, depois a imagem.
       </p>
 
       <div className="overflow-hidden rounded-lg border border-border bg-surface shadow-[var(--shadow-card)]">
