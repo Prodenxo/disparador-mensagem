@@ -29,9 +29,15 @@ function runGroupsSyncInBackground (): void {
       return
     }
 
-    completeGroupsSync(result.data.count)
+    completeGroupsSync({
+      count: result.data.count,
+      removed: result.data.removed,
+      skipped: result.data.skipped
+    })
     revalidatePath('/grupos')
     revalidatePath('/anuncios/novo')
+    revalidatePath('/campanhas')
+    revalidatePath('/campanhas/nova')
   })().catch(error => {
     console.error('[api/groups background sync]', error)
     const message = error instanceof Error ? error.message : 'Erro ao sincronizar grupos'

@@ -33,6 +33,7 @@ export function GroupsManager ({ initialGroups, canSync }: GroupsManagerProps) {
   const router = useRouter()
   const [groups, setGroups] = useState(initialGroups)
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -67,6 +68,7 @@ export function GroupsManager ({ initialGroups, canSync }: GroupsManagerProps) {
     if (sync.status === 'running') {
       setIsSyncing(true)
       setError(null)
+      setSuccessMessage(null)
       return
     }
 
@@ -74,11 +76,24 @@ export function GroupsManager ({ initialGroups, canSync }: GroupsManagerProps) {
 
     if (sync.status === 'error' && sync.error) {
       setError(sync.error)
+      setSuccessMessage(null)
       return
     }
 
     if (sync.status === 'success') {
       setError(null)
+
+      const parts = [`${sync.count ?? 0} grupo(s) sincronizado(s).`]
+
+      if ((sync.removed ?? 0) > 0) {
+        parts.push(`${sync.removed} grupo(s) antigo(s) removido(s).`)
+      }
+
+      if ((sync.skipped ?? 0) > 0) {
+        parts.push(`${sync.skipped} grupo(s) mantido(s) por ter anúncio ou campanha vinculada.`)
+      }
+
+      setSuccessMessage(parts.join(' '))
       router.refresh()
     }
   }, [router])
@@ -137,6 +152,7 @@ export function GroupsManager ({ initialGroups, canSync }: GroupsManagerProps) {
 
   async function handleSync () {
     setError(null)
+    setSuccessMessage(null)
     setIsSyncing(true)
 
     try {
@@ -191,6 +207,10 @@ export function GroupsManager ({ initialGroups, canSync }: GroupsManagerProps) {
             ? 'Nenhum grupo sincronizado ainda. Adicione o bot aos grupos no WhatsApp e clique em "Sincronizar agora".'
             : 'Nenhum grupo disponível. Peça a um administrador para sincronizar.'}
         </div>
+      )}
+
+      {successMessage && (
+        <p className="text-sm text-success" role="status">{successMessage}</p>
       )}
 
       {error && (

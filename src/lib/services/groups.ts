@@ -23,10 +23,16 @@ export async function listGroupsService (): Promise<GroupRow[]> {
   })
 }
 
-export async function syncGroupsService (): Promise<ActionResult<{ count: number; syncedAt: string }>> {
+export async function syncGroupsService (): Promise<ActionResult<{
+  count: number
+  removed: number
+  skipped: number
+  syncedAt: string
+}>> {
   try {
     const remoteGroups = await fetchAllGroups()
     const syncedAt = new Date()
+    const remoteJids = remoteGroups.map(group => group.jid)
 
     for (const group of remoteGroups) {
       await prisma.whatsappGroup.upsert({
@@ -45,8 +51,37 @@ export async function syncGroupsService (): Promise<ActionResult<{ count: number
       })
     }
 
+    const staleGroups = await prisma.whatsappGroup.findMany({
+      where: remoteJids.length > 0
+        ? { jid: { notIn: remoteJids } }
+        : {},
+      select: {
+        id: true,
+        _count: {
+          select: {
+            announcements: true,
+            continuousCampaigns: true
+          }
+        }
+      }
+    })
+
+    const deletableIds = staleGroups
+      .filter(group => group._count.announcements === 0 && group._count.continuousCampaigns === 0)
+      .map(group => group.id)
+
+    const skipped = staleGroups.length - deletableIds.length
+
+    if (deletableIds.length > 0) {
+      await prisma.whatsappGroup.deleteMany({
+        where: { id: { in: deletableIds } }
+      })
+    }
+
     return actionSuccess({
       count: remoteGroups.length,
+      removed: deletableIds.length,
+      skipped,
       syncedAt: syncedAt.toISOString()
     })
   } catch (error) {
