@@ -299,6 +299,64 @@ export async function sendTextWithMentions (
   await axios.post(instanceUrl('/message/sendText'), payload, { headers: headers() })
 }
 
+export async function sendTextPrivate (
+  phone: string,
+  text: string
+): Promise<void> {
+  await axios.post(
+    instanceUrl('/message/sendText'),
+    {
+      number: phone,
+      text,
+      options: { linkPreview: false }
+    },
+    { headers: headers() }
+  )
+}
+
+export async function sendMediaPrivateFromBase64 (
+  phone: string,
+  base64: string,
+  fileName: string,
+  mimetype: string,
+  caption: string
+): Promise<void> {
+  await axios.post(
+    instanceUrl('/message/sendMedia'),
+    {
+      number: phone,
+      mediatype: 'image',
+      mimetype,
+      caption,
+      media: base64,
+      fileName
+    },
+    { headers: headers() }
+  )
+}
+
+export async function sendMediaPrivate (
+  phone: string,
+  imagePath: string,
+  caption: string
+): Promise<void> {
+  const base64 = fs.readFileSync(imagePath).toString('base64')
+  const fileName = path.basename(imagePath)
+
+  await axios.post(
+    instanceUrl('/message/sendMedia'),
+    {
+      number: phone,
+      mediatype: 'image',
+      mimetype: 'image/jpeg',
+      caption,
+      media: base64,
+      fileName
+    },
+    { headers: headers() }
+  )
+}
+
 export async function sendMediaWithMentionsFromBase64 (
   groupJid: string,
   base64: string,

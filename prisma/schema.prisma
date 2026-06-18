@@ -25,6 +25,14 @@ enum AnnouncementStatus {
   CANCELLED
 }
 
+enum PrivateCampaignStatus {
+  SCHEDULED
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
+}
+
 model User {
   id           String      @id @default(uuid())
   email        String      @unique
@@ -38,6 +46,9 @@ model User {
   sectorLinks          UserSector[]
   announcements        Announcement[]        @relation("CreatedBy")
   continuousCampaigns  ContinuousCampaign[]  @relation("CampaignCreatedBy")
+  contacts             Contact[]             @relation("ContactCreatedBy")
+  contactLists         ContactList[]         @relation("ContactListCreatedBy")
+  privateCampaigns     PrivateCampaign[]     @relation("PrivateCampaignCreatedBy")
 }
 
 model Sector {
@@ -51,6 +62,9 @@ model Sector {
   members              UserSector[]
   announcements        Announcement[]
   continuousCampaigns  ContinuousCampaign[]
+  contacts             Contact[]
+  contactLists         ContactList[]
+  privateCampaigns     PrivateCampaign[]
 }
 
 model UserSector {
@@ -89,6 +103,7 @@ model AnnouncementImage {
 
   announcements       Announcement[]
   continuousCampaigns ContinuousCampaign[]
+  privateCampaigns    PrivateCampaign[]
 }
 
 model Announcement {
@@ -167,4 +182,89 @@ model CampaignDispatchLog {
   sentAt         DateTime @default(now())
 
   campaign ContinuousCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
+
+model Contact {
+  id          String   @id @default(uuid())
+  sectorId    String
+  name        String
+  phone       String
+  notes       String?  @db.Text
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sector       Sector               @relation(fields: [sectorId], references: [id])
+  createdBy    User                 @relation("ContactCreatedBy", fields: [createdById], references: [id])
+  listMembers  ContactListMember[]
+  dispatchLogs PrivateDispatchLog[]
+
+  @@unique([sectorId, phone])
+  @@index([sectorId])
+}
+
+model ContactList {
+  id          String   @id @default(uuid())
+  sectorId    String
+  name        String
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sector    Sector              @relation(fields: [sectorId], references: [id])
+  createdBy User                @relation("ContactListCreatedBy", fields: [createdById], references: [id])
+  members   ContactListMember[]
+  campaigns PrivateCampaign[]
+
+  @@index([sectorId])
+}
+
+model ContactListMember {
+  id        String   @id @default(uuid())
+  listId    String
+  contactId String
+  addedAt   DateTime @default(now())
+
+  list    ContactList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  contact Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, contactId])
+}
+
+model PrivateCampaign {
+  id              String                @id @default(uuid())
+  name            String
+  sectorId        String
+  listId          String
+  message         String                @db.Text
+  imagePath       String?
+  imageId         String?
+  scheduledAt     DateTime
+  intervalSeconds Int                   @default(45)
+  status          PrivateCampaignStatus @default(SCHEDULED)
+  createdById     String
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  sector    Sector             @relation(fields: [sectorId], references: [id])
+  list      ContactList        @relation(fields: [listId], references: [id])
+  image     AnnouncementImage? @relation(fields: [imageId], references: [id])
+  createdBy User               @relation("PrivateCampaignCreatedBy", fields: [createdById], references: [id])
+  logs      PrivateDispatchLog[]
+
+  @@index([status, scheduledAt])
+}
+
+model PrivateDispatchLog {
+  id           String   @id @default(uuid())
+  campaignId   String
+  contactId    String
+  status       String
+  errorMessage String?  @db.Text
+  sentAt       DateTime @default(now())
+
+  campaign PrivateCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact  Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, contactId])
 }

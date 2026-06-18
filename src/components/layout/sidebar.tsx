@@ -8,6 +8,7 @@ import {
   Megaphone,
   Radio,
   Settings,
+  UserRound,
   Users,
   UsersRound,
   MessageSquare
@@ -47,6 +48,12 @@ export function Sidebar ({ user }: SidebarProps) {
       href: '/campanhas',
       label: 'Campanhas contínuas',
       icon: Radio,
+      visible: true
+    },
+    {
+      href: '/privado',
+      label: 'Disparo privado',
+      icon: UserRound,
       visible: true
     },
     {
